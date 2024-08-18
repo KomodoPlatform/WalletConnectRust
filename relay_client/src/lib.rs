@@ -1,6 +1,6 @@
 use {
     crate::error::{ClientError, RequestBuildError},
-    ::http::HeaderMap,
+    ::http::{HeaderMap, Uri},
     relay_rpc::{
         auth::{SerializedAuthToken, RELAY_WEBSOCKET_ADDRESS},
         domain::{MessageId, ProjectId, SubscriptionId},
@@ -12,7 +12,7 @@ use {
         atomic::{AtomicU8, Ordering},
         Arc,
     },
-    url::Url,
+    url::Url
 };
 
 pub mod error;
@@ -98,23 +98,19 @@ impl ConnectionOptions {
         })
         .map_err(RequestBuildError::Query)?;
 
-        let mut url = Url::parse(&self.address).map_err(RequestBuildError::Url)?;
+        let mut url = Url::parse(&self.address).map_err(|err|RequestBuildError::Url(err.to_string()))?;
         url.set_query(Some(&query));
 
         Ok(url)
     }
 
     fn as_ws_request(&self) -> Result<HttpRequest<()>, RequestBuildError> {
-        use {
-            crate::websocket::WebsocketClientError,
-            tokio_tungstenite::tungstenite::client::IntoClientRequest,
-        };
+        use crate::websocket::WebsocketClientError;
 
         let url = self.as_url()?;
 
-        let mut request = url
-            .into_client_request()
-            .map_err(WebsocketClientError::Transport)?;
+        let mut request =
+            into_client_request(url.as_str()).map_err(|err|WebsocketClientError::IntoClientError(err.to_string()))?;
 
         self.update_request_headers(request.headers_mut())?;
 
@@ -179,6 +175,46 @@ fn convert_subscription_result(
         SubscriptionResult::Id(id) => Ok(id),
         SubscriptionResult::Error(err) => Err(ClientError::from(err).into()),
     }
+}
+
+/// Generate a random key for the `Sec-WebSocket-Key` header.
+pub fn generate_websocket_key() -> String {
+    // a base64-encoded (see Section 4 of [RFC4648]) value that,
+    // when decoded, is 16 bytes in length (RFC 6455)
+    let r: [u8; 16] = rand::random();
+    data_encoding::BASE64.encode(&r)
+}
+
+/// Converts a URL string into an HTTP request for initiating a WebSocket connection.
+fn into_client_request(url: &str) -> Result<HttpRequest<()>, RequestBuildError> {
+    let uri: Uri = url
+        .parse()
+        .map_err(|_| RequestBuildError::Url("Invalid url".to_owned()))?;
+    let authority = uri
+        .authority()
+        .ok_or(RequestBuildError::Url("Url has not authority".to_owned()))?
+        .as_str();
+    let host = authority
+        .find('@')
+        .map(|idx| authority.split_at(idx + 1).1)
+        .unwrap_or_else(|| authority);
+
+    // Check if the host is empty (excluding the port)
+    if host.split(':').next().unwrap_or("").is_empty() {
+        return Err(RequestBuildError::Url("EmptyHostName".to_owned()));
+    }
+
+    let req = HttpRequest::builder()
+        .method("GET")
+        .header("Host", host)
+        .header("Connection", "Upgrade")
+        .header("Upgrade", "websocket")
+        .header("Sec-WebSocket-Version", "13")
+        .header("Sec-WebSocket-Key", generate_websocket_key())
+        .uri(uri)
+        .body(())
+        .map_err(|err| RequestBuildError::Url(err.to_string()))?;
+    Ok(req)
 }
 
 #[cfg(test)]

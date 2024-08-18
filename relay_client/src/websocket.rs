@@ -7,19 +7,9 @@ use {
     relay_rpc::{
         domain::{MessageId, SubscriptionId, Topic},
         rpc::{
-            BatchFetchMessages,
-            BatchReceiveMessages,
-            BatchSubscribe,
-            BatchSubscribeBlocking,
-            BatchUnsubscribe,
-            FetchMessages,
-            Publish,
-            Receipt,
-            Subscribe,
-            SubscribeBlocking,
-            Subscription,
-            SubscriptionError,
-            Unsubscribe,
+            BatchFetchMessages, BatchReceiveMessages, BatchSubscribe, BatchSubscribeBlocking,
+            BatchUnsubscribe, FetchMessages, Publish, Receipt, Subscribe, SubscribeBlocking,
+            Subscription, SubscriptionError, Unsubscribe,
         },
     },
     std::{future::Future, sync::Arc, time::Duration},
@@ -29,14 +19,10 @@ use {
     },
 };
 pub use {
-    fetch::*,
-    inbound::*,
-    outbound::*,
-    stream::*,
-    tokio_tungstenite::tungstenite::protocol::CloseFrame,
+    fetch::*, inbound::*, outbound::*, stream::*, tokio_tungstenite_wasm::CloseFrame,
 };
 
-pub type TransportError = tokio_tungstenite::tungstenite::Error;
+pub type TransportError = tokio_tungstenite_wasm::Error;
 
 #[derive(Debug, thiserror::Error)]
 pub enum WebsocketClientError {
@@ -54,6 +40,9 @@ pub enum WebsocketClientError {
 
     #[error("Not connected")]
     NotConnected,
+
+    #[error("Url error: {0}")]
+    IntoClientError(String)
 }
 
 /// Wrapper around the websocket [`CloseFrame`] providing info about the

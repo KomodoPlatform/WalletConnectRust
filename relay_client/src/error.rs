@@ -14,7 +14,7 @@ pub enum RequestBuildError {
     Headers,
 
     #[error("Failed to parse connection URL: {0}")]
-    Url(#[from] url::ParseError),
+    Url(String),
 
     #[error("Failed to create websocket request: {0}")]
     WebsocketClient(#[from] crate::websocket::WebsocketClientError),
