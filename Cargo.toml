@@ -36,12 +36,12 @@ name = "websocket_client"
 required-features = ["client", "rpc"]
 
 [[example]]
-name = "ws_unmanaged"
-required-features = ["client", "rpc"]
-
-[[example]]
 name = "http_client"
 required-features = ["client", "rpc", "http"]
+
+[[example]]
+name = "ws_unmanaged"
+required-features = ["client", "rpc"]
 
 [[example]]
 name = "webhook"
