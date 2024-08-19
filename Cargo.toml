@@ -11,8 +11,9 @@ members = ["blockchain_api", "relay_client", "relay_rpc"]
 
 [features]
 default = ["full"]
-full = ["client", "rpc"]
+full = ["client", "rpc", "http"]
 client = ["dep:relay_client"]
+http = ["relay_client/http"]
 rpc = ["dep:relay_rpc"]
 
 [dependencies]
@@ -40,7 +41,7 @@ required-features = ["client", "rpc"]
 
 [[example]]
 name = "http_client"
-required-features = ["client", "rpc"]
+required-features = ["client", "rpc", "http"]
 
 [[example]]
 name = "webhook"

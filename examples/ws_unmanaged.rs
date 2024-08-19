@@ -10,7 +10,7 @@ use structopt::StructOpt;
 #[derive(StructOpt)]
 struct Args {
     /// Specify WebSocket address.
-    #[structopt(short, long, default_value = "wss://relay.walletconnect.com")]
+    #[structopt(short, long, default_value = "wss://relay.walletconnect.org")]
     address: String,
 
     /// Specify WalletConnect project ID.

@@ -21,6 +21,10 @@ use {
 pub use {
     fetch::*, inbound::*, outbound::*, stream::*, tokio_tungstenite_wasm::CloseFrame, connection::{Connection, ConnectionControl}
 };
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::spawn;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen_futures::spawn_local as spawn;
 
 pub type TransportError = tokio_tungstenite_wasm::Error;
 
@@ -136,7 +140,7 @@ impl Client {
     {
         let (control_tx, control_rx) = mpsc::unbounded_channel();
 
-        tokio::spawn(connection_event_loop(control_rx, handler));
+        spawn(connection_event_loop(control_rx, handler));
 
         Self { control_tx, control_rx: None }
     }
