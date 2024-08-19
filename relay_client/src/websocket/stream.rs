@@ -26,6 +26,7 @@ use {
 /// Opens a connection to the Relay and returns [`ClientStream`] for the
 /// connection.
 pub async fn create_stream(request: HttpRequest<()>) -> Result<ClientStream, WebsocketClientError> {
+    println!("{:?}", request.uri().to_string());
     let conn = connect(request.uri().to_string())
         .await
         .map_err(WebsocketClientError::ConnectionFailed)?;

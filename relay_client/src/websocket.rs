@@ -1,5 +1,5 @@
 use {
-    self::connection::{connection_event_loop, ConnectionControl},
+    self::connection::connection_event_loop,
     crate::{
         error::{ClientError, Error},
         ConnectionOptions,
@@ -14,12 +14,12 @@ use {
     },
     std::{future::Future, sync::Arc, time::Duration},
     tokio::sync::{
-        mpsc::{self, UnboundedSender},
-        oneshot,
+        mpsc::{self, UnboundedReceiver, UnboundedSender},
+        oneshot, Mutex,
     },
 };
 pub use {
-    fetch::*, inbound::*, outbound::*, stream::*, tokio_tungstenite_wasm::CloseFrame,
+    fetch::*, inbound::*, outbound::*, stream::*, tokio_tungstenite_wasm::CloseFrame, connection::{Connection, ConnectionControl}
 };
 
 pub type TransportError = tokio_tungstenite_wasm::Error;
@@ -79,7 +79,7 @@ pub struct PublishedMessage {
 }
 
 impl PublishedMessage {
-    fn from_request(request: &InboundRequest<Subscription>) -> Self {
+    pub fn from_request(request: &InboundRequest<Subscription>) -> Self {
         let Subscription { id, data } = request.data();
         let now = chrono::Utc::now();
 
@@ -125,6 +125,7 @@ type SubscriptionResult<T> = Result<T, Error<SubscriptionError>>;
 #[derive(Debug, Clone)]
 pub struct Client {
     control_tx: UnboundedSender<ConnectionControl>,
+    control_rx: Option<Arc<Mutex<UnboundedReceiver<ConnectionControl>>>>
 }
 
 impl Client {
@@ -137,7 +138,18 @@ impl Client {
 
         tokio::spawn(connection_event_loop(control_rx, handler));
 
-        Self { control_tx }
+        Self { control_tx, control_rx: None }
+    }
+
+    /// Creates a new managed [`Client`] with the provided handler.
+    pub fn new_unmanaged() -> Self
+    {
+        let (control_tx, control_rx) = mpsc::unbounded_channel();
+        Self { control_tx, control_rx: Some(Arc::new(control_rx.into())) }
+    }
+
+    pub fn control_rx(&self) -> Option<Arc<Mutex<UnboundedReceiver<ConnectionControl>>>> {
+        self.control_rx.clone()
     }
 
     /// Publishes a message over the network on given topic.
