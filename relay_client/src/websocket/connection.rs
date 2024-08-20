@@ -2,11 +2,14 @@ use {
     super::{
         outbound::OutboundRequest,
         stream::{create_stream, ClientStream},
-        ConnectionHandler, TransportError, WebsocketClientError,
+        ConnectionHandler,
+        TransportError,
+        WebsocketClientError,
     },
     crate::{
         websocket::{stream::StreamEvent, PublishedMessage},
-        ClientError, HttpRequest,
+        ClientError,
+        HttpRequest,
     },
     futures_util::{stream::FusedStream, Stream, StreamExt},
     std::{
@@ -95,13 +98,14 @@ pub(super) async fn connection_event_loop<T>(
     }
 }
 
+#[derive(Default)]
 pub struct Connection {
     stream: Option<ClientStream>,
 }
 
 impl Connection {
-  pub fn new() -> Self {
-        Self { stream: None }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub async fn connect(&mut self, request: HttpRequest<()>) -> Result<(), ClientError> {

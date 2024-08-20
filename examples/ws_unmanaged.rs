@@ -1,11 +1,17 @@
-use futures_util::StreamExt;
-use relay_client::{websocket::{Client, Connection, ConnectionControl, PublishedMessage}, ConnectionOptions};
-use relay_rpc::{auth::{ed25519_dalek::SigningKey, AuthToken}, domain::Topic};
-use tokio::spawn;
-use std::{sync::Arc, time::Duration};
-use relay_client::websocket::StreamEvent;
-use structopt::StructOpt;
-
+use {
+    futures_util::StreamExt,
+    relay_client::{
+        websocket::{Client, Connection, ConnectionControl, PublishedMessage, StreamEvent},
+        ConnectionOptions,
+    },
+    relay_rpc::{
+        auth::{ed25519_dalek::SigningKey, AuthToken},
+        domain::Topic,
+    },
+    std::{sync::Arc, time::Duration},
+    structopt::StructOpt,
+    tokio::spawn,
+};
 
 #[derive(StructOpt)]
 struct Args {
@@ -30,9 +36,9 @@ fn create_conn_opts(address: &str, project_id: &str) -> ConnectionOptions {
     ConnectionOptions::new(project_id, auth).with_address(address)
 }
 
-async fn client_event_loop(client: Arc<Client>){
+async fn client_event_loop(client: Arc<Client>) {
     let mut conn = Connection::new();
-    if let Some(control_rx)= client.control_rx() {
+    if let Some(control_rx) = client.control_rx() {
         let mut control_rx = control_rx.lock().await;
 
         loop {

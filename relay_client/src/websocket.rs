@@ -1,3 +1,7 @@
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::spawn;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen_futures::spawn_local as spawn;
 use {
     self::connection::connection_event_loop,
     crate::{
@@ -7,24 +11,36 @@ use {
     relay_rpc::{
         domain::{MessageId, SubscriptionId, Topic},
         rpc::{
-            BatchFetchMessages, BatchReceiveMessages, BatchSubscribe, BatchSubscribeBlocking,
-            BatchUnsubscribe, FetchMessages, Publish, Receipt, Subscribe, SubscribeBlocking,
-            Subscription, SubscriptionError, Unsubscribe,
+            BatchFetchMessages,
+            BatchReceiveMessages,
+            BatchSubscribe,
+            BatchSubscribeBlocking,
+            BatchUnsubscribe,
+            FetchMessages,
+            Publish,
+            Receipt,
+            Subscribe,
+            SubscribeBlocking,
+            Subscription,
+            SubscriptionError,
+            Unsubscribe,
         },
     },
     std::{future::Future, sync::Arc, time::Duration},
     tokio::sync::{
         mpsc::{self, UnboundedReceiver, UnboundedSender},
-        oneshot, Mutex,
+        oneshot,
+        Mutex,
     },
 };
 pub use {
-    fetch::*, inbound::*, outbound::*, stream::*, tokio_tungstenite_wasm::CloseFrame, connection::{Connection, ConnectionControl}
+    connection::{Connection, ConnectionControl},
+    fetch::*,
+    inbound::*,
+    outbound::*,
+    stream::*,
+    tokio_tungstenite_wasm::CloseFrame,
 };
-#[cfg(not(target_arch = "wasm32"))]
-use tokio::spawn;
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen_futures::spawn_local as spawn;
 
 pub type TransportError = tokio_tungstenite_wasm::Error;
 
@@ -46,7 +62,7 @@ pub enum WebsocketClientError {
     NotConnected,
 
     #[error("Url error: {0}")]
-    IntoClientError(String)
+    IntoClientError(String),
 }
 
 /// Wrapper around the websocket [`CloseFrame`] providing info about the
@@ -129,7 +145,7 @@ type SubscriptionResult<T> = Result<T, Error<SubscriptionError>>;
 #[derive(Debug, Clone)]
 pub struct Client {
     control_tx: UnboundedSender<ConnectionControl>,
-    control_rx: Option<Arc<Mutex<UnboundedReceiver<ConnectionControl>>>>
+    control_rx: Option<Arc<Mutex<UnboundedReceiver<ConnectionControl>>>>,
 }
 
 impl Client {
@@ -142,14 +158,19 @@ impl Client {
 
         spawn(connection_event_loop(control_rx, handler));
 
-        Self { control_tx, control_rx: None }
+        Self {
+            control_tx,
+            control_rx: None,
+        }
     }
 
     /// Creates a new managed [`Client`] with the provided handler.
-    pub fn new_unmanaged() -> Self
-    {
+    pub fn new_unmanaged() -> Self {
         let (control_tx, control_rx) = mpsc::unbounded_channel();
-        Self { control_tx, control_rx: Some(Arc::new(control_rx.into())) }
+        Self {
+            control_tx,
+            control_rx: Some(Arc::new(control_rx.into())),
+        }
     }
 
     pub fn control_rx(&self) -> Option<Arc<Mutex<UnboundedReceiver<ConnectionControl>>>> {
