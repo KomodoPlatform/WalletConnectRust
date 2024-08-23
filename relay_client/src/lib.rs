@@ -1,13 +1,19 @@
 use {
-    crate::error::{ClientError, RequestBuildError}, ::http::{HeaderMap, Uri}, rand::RngCore, relay_rpc::{
+    crate::error::{ClientError, RequestBuildError},
+    ::http::{HeaderMap, Uri},
+    rand::RngCore,
+    relay_rpc::{
         auth::{SerializedAuthToken, RELAY_WEBSOCKET_ADDRESS},
         domain::{MessageId, ProjectId, SubscriptionId},
         rpc::{SubscriptionError, SubscriptionResult},
         user_agent::UserAgent,
-    }, serde::Serialize, std::sync::{
+    },
+    serde::Serialize,
+    std::sync::{
         atomic::{AtomicU8, Ordering},
         Arc,
-    }, url::Url
+    },
+    url::Url,
 };
 
 pub mod error;
@@ -180,7 +186,7 @@ pub fn generate_websocket_key() -> Result<String, String> {
     // when decoded, is 16 bytes in length (RFC 6455)
     let mut rng = rand::rngs::OsRng;
     let mut r: [u8; 16] = [0u8; 16];
-    rng.try_fill_bytes(&mut r).map_err(|err|err.to_string())?;
+    rng.try_fill_bytes(&mut r).map_err(|err| err.to_string())?;
 
     Ok(data_encoding::BASE64.encode(&r))
 }
@@ -191,11 +197,14 @@ fn into_client_request(url: &str) -> Result<HttpRequest<()>, RequestBuildError> 
     let uri: Uri = url
         .parse()
         .map_err(|_| RequestBuildError::Url("Invalid url".to_owned()))?;
-    let authority = uri
-        .authority()
-        .ok_or(RequestBuildError::Url("Url has not authority".to_owned()))?
-        .as_str();
-    let host = authority.split('@').last().unwrap_or_default();
+    let host = {
+        let authority = uri
+            .authority()
+            .ok_or(RequestBuildError::Url("Url has not authority".to_owned()))?
+            .as_str();
+
+        authority.split('@').last().unwrap_or_default()
+    };
 
     // Check if the host is empty (excluding the port)
     if host.split(':').next().unwrap_or("").is_empty() {
