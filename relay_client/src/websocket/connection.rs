@@ -19,7 +19,7 @@ use {
     tokio::sync::{mpsc::UnboundedReceiver, oneshot},
 };
 
-pub(super) enum ConnectionControl {
+pub enum ConnectionControl {
     Connect {
         request: HttpRequest<()>,
         tx: oneshot::Sender<Result<(), ClientError>>,
@@ -98,16 +98,17 @@ pub(super) async fn connection_event_loop<T>(
     }
 }
 
-struct Connection {
+#[derive(Default)]
+pub struct Connection {
     stream: Option<ClientStream>,
 }
 
 impl Connection {
-    fn new() -> Self {
-        Self { stream: None }
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    async fn connect(&mut self, request: HttpRequest<()>) -> Result<(), ClientError> {
+    pub async fn connect(&mut self, request: HttpRequest<()>) -> Result<(), ClientError> {
         if let Some(mut stream) = self.stream.take() {
             stream.close(None).await?;
         }
@@ -117,7 +118,7 @@ impl Connection {
         Ok(())
     }
 
-    async fn disconnect(&mut self) -> Result<(), ClientError> {
+    pub async fn disconnect(&mut self) -> Result<(), ClientError> {
         let stream = self.stream.take();
 
         match stream {
@@ -127,7 +128,7 @@ impl Connection {
         }
     }
 
-    fn request(&mut self, request: OutboundRequest) {
+    pub fn request(&mut self, request: OutboundRequest) {
         match &mut self.stream {
             Some(stream) => stream.send_raw(request),
 
@@ -140,7 +141,7 @@ impl Connection {
         }
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.stream = None;
     }
 }

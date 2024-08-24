@@ -14,11 +14,12 @@ pub enum RequestBuildError {
     Headers,
 
     #[error("Failed to parse connection URL: {0}")]
-    Url(#[from] url::ParseError),
+    Url(String),
 
     #[error("Failed to create websocket request: {0}")]
     WebsocketClient(#[from] crate::websocket::WebsocketClientError),
 
+    #[cfg(feature = "http")]
     #[error("Failed to create HTTP request: {0}")]
     HttpClient(#[from] crate::http::HttpClientError),
 }
@@ -32,6 +33,7 @@ pub enum ClientError {
     #[error("Websocket client error: {0}")]
     WebsocketClient(#[from] crate::websocket::WebsocketClientError),
 
+    #[cfg(feature = "http")]
     #[error("HTTP client error: {0}")]
     HttpClient(#[from] crate::http::HttpClientError),
 

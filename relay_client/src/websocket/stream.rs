@@ -17,32 +17,22 @@ use {
         pin::Pin,
         task::{Context, Poll},
     },
-    tokio::{
-        net::TcpStream,
-        sync::{
-            mpsc,
-            mpsc::{UnboundedReceiver, UnboundedSender},
-            oneshot,
-        },
+    tokio::sync::{
+        mpsc,
+        mpsc::{UnboundedReceiver, UnboundedSender},
+        oneshot,
     },
-    tokio_tungstenite::{
-        connect_async,
-        tungstenite::{protocol::CloseFrame, Message},
-        MaybeTlsStream,
-        WebSocketStream,
-    },
+    tokio_tungstenite_wasm::{connect, CloseFrame, Message, WebSocketStream},
 };
-
-pub type SocketStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 /// Opens a connection to the Relay and returns [`ClientStream`] for the
 /// connection.
 pub async fn create_stream(request: HttpRequest<()>) -> Result<ClientStream, WebsocketClientError> {
-    let (socket, _) = connect_async(request)
+    let conn = connect(request.uri().to_string())
         .await
         .map_err(WebsocketClientError::ConnectionFailed)?;
 
-    Ok(ClientStream::new(socket))
+    Ok(ClientStream::new(conn))
 }
 
 /// Possible events produced by the [`ClientStream`].
@@ -78,16 +68,17 @@ pub enum StreamEvent {
 /// For a higher-level interface see [`Client`](crate::client::Client). For an
 /// example usage of the stream see `client::connection` module.
 pub struct ClientStream {
-    socket: SocketStream,
+    socket: WebSocketStream,
     outbound_tx: UnboundedSender<Message>,
     outbound_rx: UnboundedReceiver<Message>,
     requests: HashMap<MessageId, oneshot::Sender<Result<serde_json::Value, ClientError>>>,
     id_generator: MessageIdGenerator,
     close_frame: Option<CloseFrame<'static>>,
+    is_terminated: bool,
 }
 
 impl ClientStream {
-    pub fn new(socket: SocketStream) -> Self {
+    pub fn new(socket: WebSocketStream) -> Self {
         let requests = HashMap::new();
         let (outbound_tx, outbound_rx) = mpsc::unbounded_channel();
         let id_generator = MessageIdGenerator::new();
@@ -99,6 +90,7 @@ impl ClientStream {
             requests,
             id_generator,
             close_frame: None,
+            is_terminated: false,
         }
     }
 
@@ -141,9 +133,9 @@ impl ClientStream {
 
     /// Closes the connection.
     pub async fn close(&mut self, frame: Option<CloseFrame<'static>>) -> Result<(), ClientError> {
-        self.close_frame = frame.clone();
+        self.close_frame.clone_from(&frame);
         self.socket
-            .close(frame)
+            .close()
             .await
             .map_err(|err| WebsocketClientError::ClosingFailed(err).into())
     }
@@ -220,11 +212,9 @@ impl ClientStream {
                 }
 
                 Message::Close(frame) => {
-                    self.close_frame = frame.clone();
+                    self.close_frame.clone_from(frame);
                     Some(StreamEvent::ConnectionClosed(frame.clone()))
                 }
-
-                _ => None,
             },
 
             Err(error) => Some(StreamEvent::InboundError(
@@ -269,7 +259,7 @@ impl Stream for ClientStream {
     type Item = StreamEvent;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.socket.is_terminated() {
+        if self.is_terminated() {
             return Poll::Ready(None);
         }
 
@@ -282,17 +272,21 @@ impl Stream for ClientStream {
                 }
 
                 None => {
+                    self.is_terminated = true;
                     return Poll::Ready(Some(StreamEvent::ConnectionClosed(
                         self.close_frame.clone(),
-                    )))
+                    )));
                 }
             }
         }
 
         match self.poll_write(cx) {
-            Poll::Ready(Err(error)) => Poll::Ready(Some(StreamEvent::OutboundError(
-                WebsocketClientError::Transport(error).into(),
-            ))),
+            Poll::Ready(Err(error)) => {
+                self.is_terminated = true;
+                Poll::Ready(Some(StreamEvent::OutboundError(
+                    WebsocketClientError::Transport(error).into(),
+                )))
+            }
 
             _ => Poll::Pending,
         }
@@ -301,7 +295,7 @@ impl Stream for ClientStream {
 
 impl FusedStream for ClientStream {
     fn is_terminated(&self) -> bool {
-        self.socket.is_terminated()
+        self.is_terminated
     }
 }
 

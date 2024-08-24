@@ -19,7 +19,7 @@ struct Args {
     address: String,
 
     /// Specify WalletConnect project ID.
-    #[structopt(short, long, default_value = "3cbaa32f8fbf3cdcc87d27ca1fa68069")]
+    #[structopt(short, long, default_value = "1979a8326eb123238e633655924f0a78")]
     project_id: String,
 }
 
