@@ -123,7 +123,6 @@ impl Connection {
 
         match stream {
             Some(mut stream) => stream.close(None).await,
-
             None => Err(WebsocketClientError::ClosingFailed(TransportError::AlreadyClosed).into()),
         }
     }

@@ -7,7 +7,7 @@ authors = ["WalletConnect Team"]
 license = "Apache-2.0"
 
 [workspace]
-members = ["blockchain_api", "relay_client", "relay_rpc"]
+members = ["blockchain_api", "pairing_api", "relay_client", "relay_rpc"]
 
 [features]
 default = ["full"]
@@ -15,10 +15,12 @@ full = ["client", "rpc", "http"]
 client = ["dep:relay_client"]
 http = ["relay_client/http"]
 rpc = ["dep:relay_rpc"]
+pairing = ["dep:pairing_api"]
 
 [dependencies]
 relay_client = { path = "./relay_client", optional = true }
 relay_rpc = { path = "./relay_rpc", optional = true }
+pairing_api = { path = "./pairing_api", optional = true }
 
 [dev-dependencies]
 anyhow = "1"
