@@ -40,8 +40,10 @@ pub struct SessionProposeResponse {
 
 #[cfg(test)]
 mod tests {
-    use super::{super::tests::param_serde_test, *};
-    use anyhow::Result;
+    use {
+        super::{super::tests::param_serde_test, *},
+        anyhow::Result,
+    };
 
     #[test]
     fn test_serde_session_propose_request() -> Result<()> {
