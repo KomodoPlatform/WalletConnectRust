@@ -1,8 +1,9 @@
-pub mod crypto;
+mod crypto;
 mod pairing_uri;
-pub mod session;
+mod session_key;
 
 pub use {
     crypto::*,
     pairing_uri::{Pairing, PairingParams},
+    session_key::*
 };
