@@ -1,9 +1,10 @@
 //! https://specs.walletconnect.com/2.0/specs/clients/sign/rpc-methods
 //! #wc_sessionextend
 
-use serde::{Deserialize, Serialize};
-
-use super::IrnMetadata;
+use {
+    super::IrnMetadata,
+    serde::{Deserialize, Serialize},
+};
 
 pub(super) const IRN_REQUEST_METADATA: IrnMetadata = IrnMetadata {
     tag: 1106,
@@ -25,10 +26,10 @@ pub struct SessionExtendRequest {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use super::super::tests::param_serde_test;
-    use anyhow::Result;
+    use {
+        super::{super::tests::param_serde_test, *},
+        anyhow::Result,
+    };
 
     #[test]
     fn test_serde_session_extend_request() -> Result<()> {

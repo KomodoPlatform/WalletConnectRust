@@ -4,7 +4,14 @@
 use {
     crate::domain::{DidKey, MessageId, SubscriptionId, Topic},
     params::session::{
-        delete::SessionDeleteRequest, event::SessionEventRequest, extend::SessionExtendRequest, ping::SessionPingRequest, propose::SessionProposeRequest, request::SessionRequestRequest, settle::SessionSettleRequest, update::SessionUpdateRequest, RequestParams
+        delete::SessionDeleteRequest,
+        event::SessionEventRequest,
+        extend::SessionExtendRequest,
+        propose::SessionProposeRequest,
+        request::SessionRequestRequest,
+        settle::SessionSettleRequest,
+        update::SessionUpdateRequest,
+        RequestParams,
     },
     serde::{de::DeserializeOwned, Deserialize, Serialize},
     std::{fmt::Debug, sync::Arc},

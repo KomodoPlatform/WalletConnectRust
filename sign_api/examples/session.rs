@@ -14,7 +14,17 @@ use {
         rpc::{
             params::{
                 session::{
-                    delete::SessionDeleteRequest, propose::{SessionProposeRequest, SessionProposeResponse}, settle::{Controller, SessionSettleRequest}, IrnMetadata, ProposeNamespace, ProposeNamespaces, RelayProtocolMetadata, RequestParams, ResponseParamsSuccess, SettleNamespace, SettleNamespaces
+                    delete::SessionDeleteRequest,
+                    propose::{SessionProposeRequest, SessionProposeResponse},
+                    settle::{Controller, SessionSettleRequest},
+                    IrnMetadata,
+                    ProposeNamespace,
+                    ProposeNamespaces,
+                    RelayProtocolMetadata,
+                    RequestParams,
+                    ResponseParamsSuccess,
+                    SettleNamespace,
+                    SettleNamespaces,
                 },
                 Metadata,
                 Relay,
@@ -213,8 +223,8 @@ async fn process_proposal_request(
     Ok(create_proposal_response(responder_public_key))
 }
 
-fn process_session_delete_request(delete_params: SessionDeleteRequest) ->
-ResponseParamsSuccess {     println!(
+fn process_session_delete_request(delete_params: SessionDeleteRequest) -> ResponseParamsSuccess {
+    println!(
         "\nSession is being terminated reason={}, code={}",
         delete_params.message, delete_params.code,
     );
@@ -439,39 +449,33 @@ impl Context {
     }
 
     /// Deletes session identified by the `topic`.
-       ///
-       /// When session count reaches zero, unsubscribes from topic and sends
-       /// termination signal to end the application execution.
-       ///
-       /// TODO: should really delete pairing as well:
-       /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/
-       /// rpc-methods#wc_pairingdelete
-       async fn session_delete_cleanup(&mut self, topic: Topic) -> Result<()> {
-           let _session = self
-               .sessions
-               .remove(&topic)
-               .ok_or_else(|| anyhow::anyhow!("Attempt to remove non-existing session"))?;
+    ///
+    /// When session count reaches zero, unsubscribes from topic and sends
+    /// termination signal to end the application execution.
+    ///
+    /// TODO: should really delete pairing as well:
+    /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/
+    /// rpc-methods#wc_pairingdelete
+    async fn session_delete_cleanup(&mut self, topic: Topic) -> Result<()> {
+        let _session = self
+            .sessions
+            .remove(&topic)
+            .ok_or_else(|| anyhow::anyhow!("Attempt to remove non-existing session"))?;
 
-           self.client
-               .unsubscribe(topic)
-               .await?;
+        self.client.unsubscribe(topic).await?;
 
-           // Un-pair when there are no more session subscriptions.
-           // TODO: Delete pairing, not just unsubscribe.
-           if self.sessions.is_empty() {
-               println!("\nNo active sessions left, terminating the pairing");
+        // Un-pair when there are no more session subscriptions.
+        // TODO: Delete pairing, not just unsubscribe.
+        if self.sessions.is_empty() {
+            println!("\nNo active sessions left, terminating the pairing");
 
-               self.client
-                   .unsubscribe(
-                       self.pairing.topic.clone(),
-                   )
-                   .await?;
+            self.client.unsubscribe(self.pairing.topic.clone()).await?;
 
-               self.pairing.terminator.send(()).await?;
-           }
+            self.pairing.terminator.send(()).await?;
+        }
 
-           Ok(())
-       }
+        Ok(())
+    }
 }
 
 #[tokio::main]

@@ -1,8 +1,10 @@
 //! https://specs.walletconnect.com/2.0/specs/clients/sign/rpc-methods
 //! #wc_sessiondelete
 
-use super::IrnMetadata;
-use serde::{Deserialize, Serialize};
+use {
+    super::IrnMetadata,
+    serde::{Deserialize, Serialize},
+};
 
 pub(super) const IRN_REQUEST_METADATA: IrnMetadata = IrnMetadata {
     tag: 1112,
@@ -25,10 +27,10 @@ pub struct SessionDeleteRequest {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use super::super::tests::param_serde_test;
-    use anyhow::Result;
+    use {
+        super::{super::tests::param_serde_test, *},
+        anyhow::Result,
+    };
 
     #[test]
     fn test_serde_session_delete_request() -> Result<()> {

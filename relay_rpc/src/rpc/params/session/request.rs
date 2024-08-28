@@ -1,8 +1,10 @@
 //! https://specs.walletconnect.com/2.0/specs/clients/sign/rpc-methods
 //! #wc_sessionrequest
 
-use super::IrnMetadata;
-use serde::{Deserialize, Serialize};
+use {
+    super::IrnMetadata,
+    serde::{Deserialize, Serialize},
+};
 
 pub(super) const IRN_REQUEST_METADATA: IrnMetadata = IrnMetadata {
     tag: 1108,
@@ -19,13 +21,13 @@ pub(super) const IRN_RESPONSE_METADATA: IrnMetadata = IrnMetadata {
 #[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Request {
-   pub method: String,
+    pub method: String,
     /// Opaque blockchain RPC parameters.
     ///
     /// Parsing is deferred to a higher level, blockchain RPC aware code.
-   pub params: serde_json::Value,
+    pub params: serde_json::Value,
     #[serde(skip_serializing_if = "Option::is_none")]
-  pub  expiry: Option<u64>,
+    pub expiry: Option<u64>,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone)]
@@ -37,10 +39,10 @@ pub struct SessionRequestRequest {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use super::super::tests::param_serde_test;
-    use anyhow::Result;
+    use {
+        super::{super::tests::param_serde_test, *},
+        anyhow::Result,
+    };
 
     #[test]
     fn test_serde_eth_sign_transaction() -> Result<()> {

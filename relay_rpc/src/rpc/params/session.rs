@@ -1,18 +1,29 @@
-pub mod propose;
-pub mod settle;
-pub mod request;
-pub mod ping;
 pub mod delete;
-pub mod update;
-pub mod extend;
 pub mod event;
+pub mod extend;
+pub mod ping;
+pub mod propose;
+pub mod request;
+pub mod settle;
+pub mod update;
 
 use {
-    delete::SessionDeleteRequest, event::SessionEventRequest, extend::SessionExtendRequest, paste::paste, propose::{SessionProposeRequest, SessionProposeResponse}, regex::Regex, request::SessionRequestRequest, serde::{Deserialize, Serialize}, serde_json::Value, settle::SessionSettleRequest, std::{
+    delete::SessionDeleteRequest,
+    event::SessionEventRequest,
+    extend::SessionExtendRequest,
+    paste::paste,
+    propose::{SessionProposeRequest, SessionProposeResponse},
+    regex::Regex,
+    request::SessionRequestRequest,
+    serde::{Deserialize, Serialize},
+    serde_json::Value,
+    settle::SessionSettleRequest,
+    std::{
         collections::{BTreeMap, BTreeSet},
         ops::Deref,
         sync::OnceLock,
-    }, update::SessionUpdateRequest
+    },
+    update::SessionUpdateRequest,
 };
 
 /// https://specs.walletconnect.com/2.0/specs/clients/sign/namespaces
