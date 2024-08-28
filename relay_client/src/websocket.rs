@@ -1,5 +1,5 @@
 #[cfg(not(target_arch = "wasm32"))]
-use tokio::task::spawn;
+use tokio::spawn;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_futures::spawn_local as spawn;
 use {

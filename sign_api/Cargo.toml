@@ -26,6 +26,8 @@ thiserror = "1.0"
 url = "2.3"
 x25519-dalek = { version = "2.0", features = ["static_secrets"] }
 rand = { version = "0.8" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1.22", features = [
     "rt",
     "rt-multi-thread",
@@ -33,6 +35,8 @@ tokio = { version = "1.22", features = [
     "macros",
 ] }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+tokio = { version = "1.22", features = ["sync", "macros"] }
 
 [[example]]
 name = "session"

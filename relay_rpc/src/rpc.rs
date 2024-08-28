@@ -902,6 +902,7 @@ impl Request {
             return Err(PayloadError::InvalidJsonRpcVersion);
         }
 
+        // TODO: add validation checks for Session Params
         match &self.params {
             Params::Subscribe(params) => params.validate(),
             Params::SubscribeBlocking(params) => params.validate(),
@@ -916,7 +917,6 @@ impl Request {
             Params::WatchRegister(params) => params.validate(),
             Params::WatchUnregister(params) => params.validate(),
             Params::Subscription(params) => params.validate(),
-            // Params::SessionPropose(params) => params.vl
             _ => Ok(()),
         }
     }
