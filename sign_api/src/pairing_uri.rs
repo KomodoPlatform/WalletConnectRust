@@ -105,10 +105,17 @@ impl Pairing {
         let queries = url.query_pairs();
 
         for (key, value) in queries {
-            if let Some(existing) = params.insert(key.to_string(), value.to_string()) {
+            let sanitized_key: String = key
+                .chars()
+                .filter(|c| c.is_alphanumeric() || *c == '-')
+                .collect();
+            if let Some(existing) = params.insert(sanitized_key.to_string(), value.to_string()) {
                 return Err(ParseError::UnexpectedParameter(key.into_owned(), existing));
             }
         }
+
+        let mapp = params.keys();
+        println!("{mapp:?}");
 
         let relay_protocol = params
             .remove("relay-protocol")

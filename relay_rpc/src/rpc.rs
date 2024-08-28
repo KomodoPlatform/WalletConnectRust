@@ -3,6 +3,11 @@
 
 use {
     crate::domain::{DidKey, MessageId, SubscriptionId, Topic},
+    params::session::{
+        propose::SessionProposeRequest,
+        settle::SessionSettleRequest,
+        RequestParams,
+    },
     serde::{de::DeserializeOwned, Deserialize, Serialize},
     std::{fmt::Debug, sync::Arc},
 };
@@ -10,6 +15,7 @@ pub use {error::*, watch::*};
 
 pub mod error;
 pub mod msg_id;
+pub mod params;
 #[cfg(test)]
 mod tests;
 pub mod watch;
@@ -88,6 +94,10 @@ impl Payload {
             Self::Response(response) => response.validate(),
         }
     }
+
+    pub fn irn_tag_in_range(tag: u32) -> bool {
+        (1100..=1115).contains(&tag)
+    }
 }
 
 impl<T> From<T> for Payload
@@ -96,6 +106,18 @@ where
 {
     fn from(value: T) -> Self {
         Self::Response(Response::Error(value.into()))
+    }
+}
+
+impl From<Request> for Payload {
+    fn from(value: Request) -> Self {
+        Payload::Request(value)
+    }
+}
+
+impl From<Response> for Payload {
+    fn from(value: Response) -> Self {
+        Payload::Response(value)
     }
 }
 
@@ -808,6 +830,20 @@ pub enum Params {
     /// topic the data is published for.
     #[serde(rename = "irn_subscription", alias = "iridium_subscription")]
     Subscription(Subscription),
+
+    #[serde(rename = "wc_sessionPropose")]
+    SessionPropose(SessionProposeRequest),
+    #[serde(rename = "wc_sessionSettle")]
+    SessionSettle(SessionSettleRequest),
+}
+
+impl From<RequestParams> for Params {
+    fn from(value: RequestParams) -> Self {
+        match value {
+            RequestParams::SessionPropose(param) => Params::SessionPropose(param),
+            RequestParams::SessionSettle(param) => Params::SessionSettle(param),
+        }
+    }
 }
 
 /// Data structure representing a JSON RPC request.
@@ -858,6 +894,7 @@ impl Request {
             Params::WatchRegister(params) => params.validate(),
             Params::WatchUnregister(params) => params.validate(),
             Params::Subscription(params) => params.validate(),
+            _ => Ok(()),
         }
     }
 }
