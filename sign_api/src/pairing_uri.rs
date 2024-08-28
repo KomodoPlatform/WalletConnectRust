@@ -182,8 +182,7 @@ mod tests {
                 sym_key: hex::decode(
                     "7ff3e362f825ab868e20e767fe580d0311181632707e7c878cbeca0238d45b8b",
                 )
-                .unwrap()
-                .into(),
+                .unwrap(),
                 relay_data: None,
                 expiry_timestamp: None,
             },

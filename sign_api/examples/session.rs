@@ -146,7 +146,6 @@ fn supported_propose_namespaces() -> ProposeNamespaces {
             chains: SUPPORTED_CHAINS.iter().map(|c| c.to_string()).collect(),
             methods: SUPPORTED_METHODS.iter().map(|m| m.to_string()).collect(),
             events: SUPPORTED_EVENTS.iter().map(|e| e.to_string()).collect(),
-            ..Default::default()
         });
         map
     })
@@ -159,7 +158,6 @@ fn supported_settle_namespaces() -> SettleNamespaces {
             accounts: SUPPORTED_ACCOUNTS.iter().map(|a| a.to_string()).collect(),
             methods: SUPPORTED_METHODS.iter().map(|m| m.to_string()).collect(),
             events: SUPPORTED_EVENTS.iter().map(|e| e.to_string()).collect(),
-            ..Default::default()
         });
         map
     })
@@ -207,7 +205,7 @@ async fn process_proposal_request(
 
     let session_key = SessionKey::from_osrng(&sender_public_key)?;
     let responder_public_key = hex::encode(session_key.diffie_public_key());
-    let session_topic: Topic = session_key.generate_topic().try_into()?;
+    let session_topic: Topic = session_key.generate_topic().into();
 
     {
         let mut context = context.lock().await;
@@ -396,7 +394,7 @@ impl Context {
                 .get(topic)
                 .ok_or_else(|| anyhow::anyhow!("Missing sym key for topic={} ", topic))?;
 
-            f(&session.session_key.symmetric_key())
+            f(session.session_key.symmetric_key())
         }
     }
 
@@ -433,7 +431,7 @@ impl Context {
         payload: &str,
     ) -> Result<()> {
         let encrypted = self.peek_sym_key(&topic, |key| {
-            encrypt_and_encode(EnvelopeType::Type0, &payload, key).map_err(|e| anyhow::anyhow!(e))
+            encrypt_and_encode(EnvelopeType::Type0, payload, key).map_err(|e| anyhow::anyhow!(e))
         })?;
 
         println!("\nOutbound encrypted payload={encrypted}");
@@ -486,7 +484,7 @@ impl Context {
 async fn main() -> Result<()> {
     let args = Arg::parse();
     let pairing = PairingData::from_str(&args.pairing_uri)?;
-    let topic: Topic = pairing.topic.try_into()?;
+    let topic: Topic = pairing.topic.into();
     let (inbound_sender, mut inbound_receiver) = unbounded_channel();
     let (terminate_sender, mut terminate_receiver) = channel::<()>(1);
 

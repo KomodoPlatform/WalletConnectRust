@@ -41,9 +41,10 @@ pub struct SessionProposeResponse {
 #[cfg(test)]
 mod tests {
     use super::{super::tests::param_serde_test, *};
+    use anyhow::Result;
 
     #[test]
-    fn test_serde_session_propose_request() {
+    fn test_serde_session_propose_request() -> Result<()> {
         // https://specs.walletconnect.com/2.0/specs/clients/sign/
         // session-events#session_propose
         let json = r#"
@@ -85,6 +86,6 @@ mod tests {
         }
         "#;
 
-        param_serde_test::<SessionProposeRequest>(json);
+        param_serde_test::<SessionProposeRequest>(json)
     }
 }

@@ -21,6 +21,7 @@ cacao = [
 ]
 
 [dependencies]
+anyhow = "1.0.86"
 bs58 = "0.4"
 data-encoding = "2.3"
 derive_more = { version = "0.99", default-features = false, features = [
