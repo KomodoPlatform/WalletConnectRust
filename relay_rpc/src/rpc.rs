@@ -4,9 +4,7 @@
 use {
     crate::domain::{DidKey, MessageId, SubscriptionId, Topic},
     params::session::{
-        propose::SessionProposeRequest,
-        settle::SessionSettleRequest,
-        RequestParams,
+        delete::SessionDeleteRequest, event::SessionEventRequest, extend::SessionExtendRequest, ping::SessionPingRequest, propose::SessionProposeRequest, request::SessionRequestRequest, settle::SessionSettleRequest, update::SessionUpdateRequest, RequestParams
     },
     serde::{de::DeserializeOwned, Deserialize, Serialize},
     std::{fmt::Debug, sync::Arc},
@@ -830,18 +828,35 @@ pub enum Params {
     /// topic the data is published for.
     #[serde(rename = "irn_subscription", alias = "iridium_subscription")]
     Subscription(Subscription),
-
     #[serde(rename = "wc_sessionPropose")]
     SessionPropose(SessionProposeRequest),
     #[serde(rename = "wc_sessionSettle")]
     SessionSettle(SessionSettleRequest),
+    #[serde(rename = "wc_sessionRequest")]
+    SessionRequest(SessionRequestRequest),
+    #[serde(rename = "wc_sessionEvent")]
+    SessionEvent(SessionEventRequest),
+    #[serde(rename = "wc_sessionUpdate")]
+    SessionUpdate(SessionUpdateRequest),
+    #[serde(rename = "wc_sessionDelete")]
+    SessionDelete(SessionDeleteRequest),
+    #[serde(rename = "wc_sessionExtend")]
+    SessionExtend(SessionExtendRequest),
+    #[serde(rename = "wc_sessionPing")]
+    SessionPing(()),
 }
 
 impl From<RequestParams> for Params {
     fn from(value: RequestParams) -> Self {
         match value {
-            RequestParams::SessionPropose(param) => Params::SessionPropose(param),
-            RequestParams::SessionSettle(param) => Params::SessionSettle(param),
+            RequestParams::SessionEvent(params) => Params::SessionEvent(params),
+            RequestParams::SessionSettle(params) => Params::SessionSettle(params),
+            RequestParams::SessionExtend(params) => Params::SessionExtend(params),
+            RequestParams::SessionUpdate(params) => Params::SessionUpdate(params),
+            RequestParams::SessionPropose(params) => Params::SessionPropose(params),
+            RequestParams::SessionRequest(params) => Params::SessionRequest(params),
+            RequestParams::SessionDelete(params) => Params::SessionDelete(params),
+            RequestParams::SessionPing(()) => Params::SessionPing(()),
         }
     }
 }
@@ -894,6 +909,7 @@ impl Request {
             Params::WatchRegister(params) => params.validate(),
             Params::WatchUnregister(params) => params.validate(),
             Params::Subscription(params) => params.validate(),
+            // Params::SessionPropose(params) => params.vl
             _ => Ok(()),
         }
     }

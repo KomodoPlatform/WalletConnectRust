@@ -1,18 +1,18 @@
 pub mod propose;
 pub mod settle;
+pub mod request;
+pub mod ping;
+pub mod delete;
+pub mod update;
+pub mod extend;
+pub mod event;
 
 use {
-    paste::paste,
-    propose::{SessionProposeRequest, SessionProposeResponse},
-    regex::Regex,
-    serde::{Deserialize, Serialize},
-    serde_json::Value,
-    settle::SessionSettleRequest,
-    std::{
+    delete::SessionDeleteRequest, event::SessionEventRequest, extend::SessionExtendRequest, paste::paste, propose::{SessionProposeRequest, SessionProposeResponse}, regex::Regex, request::SessionRequestRequest, serde::{Deserialize, Serialize}, serde_json::Value, settle::SessionSettleRequest, std::{
         collections::{BTreeMap, BTreeSet},
         ops::Deref,
         sync::OnceLock,
-    },
+    }, update::SessionUpdateRequest
 };
 
 /// https://specs.walletconnect.com/2.0/specs/clients/sign/namespaces
@@ -291,7 +291,12 @@ macro_rules! impl_relay_protocol_metadata {
                     match self {
                         [<$param_type>]::SessionPropose(_) => propose::[<IRN_ $meta:upper _METADATA>],
                         [<$param_type>]::SessionSettle(_) => propose::[<IRN_ $meta:upper _METADATA>],
-
+                        [<$param_type>]::SessionRequest(_) => propose::[<IRN_ $meta:upper _METADATA>],
+                        [<$param_type>]::SessionUpdate(_) => propose::[<IRN_ $meta:upper _METADATA>],
+                        [<$param_type>]::SessionDelete(_) => propose::[<IRN_ $meta:upper _METADATA>],
+                        [<$param_type>]::SessionEvent(_) => propose::[<IRN_ $meta:upper _METADATA>],
+                        [<$param_type>]::SessionExtend(_) => propose::[<IRN_ $meta:upper _METADATA>],
+                        [<$param_type>]::SessionPing(_) => propose::[<IRN_ $meta:upper _METADATA>],
                     }
                 }
             }
@@ -312,6 +317,16 @@ macro_rules! impl_relay_protocol_helpers {
                         Ok(Self::SessionPropose(serde_json::from_value(value)?))
                     } else if tag == settle::IRN_RESPONSE_METADATA.tag {
                         Ok(Self::SessionSettle(serde_json::from_value(value)?))
+                    }  else if tag == request::IRN_RESPONSE_METADATA.tag {
+                        Ok(Self::SessionRequest(serde_json::from_value(value)?))
+                    }  else if tag == delete::IRN_RESPONSE_METADATA.tag {
+                        Ok(Self::SessionDelete(serde_json::from_value(value)?))
+                    }  else if tag == extend::IRN_RESPONSE_METADATA.tag {
+                        Ok(Self::SessionExtend(serde_json::from_value(value)?))
+                    }  else if tag == update::IRN_RESPONSE_METADATA.tag {
+                        Ok(Self::SessionUpdate(serde_json::from_value(value)?))
+                    }  else if tag == event::IRN_RESPONSE_METADATA.tag {
+                        Ok(Self::SessionEvent(serde_json::from_value(value)?))
                     } else {
                         Err(ParamsError::ResponseTag(tag))
                     }
@@ -332,18 +347,18 @@ pub enum RequestParams {
     SessionPropose(SessionProposeRequest),
     #[serde(rename = "wc_sessionSettle")]
     SessionSettle(SessionSettleRequest),
-    // #[serde(rename = "wc_sessionUpdate")]
-    // SessionUpdate(SessionUpdateRequest),
-    // #[serde(rename = "wc_sessionExtend")]
-    // SessionExtend(SessionExtendRequest),
-    // #[serde(rename = "wc_sessionRequest")]
-    // SessionRequest(SessionRequestRequest),
-    // #[serde(rename = "wc_sessionEvent")]
-    // SessionEvent(SessionEventRequest),
-    // #[serde(rename = "wc_sessionDelete")]
-    // SessionDelete(SessionDeleteRequest),
-    // #[serde(rename = "wc_sessionPing")]
-    // SessionPing(()),
+    #[serde(rename = "wc_sessionUpdate")]
+    SessionUpdate(SessionUpdateRequest),
+    #[serde(rename = "wc_sessionExtend")]
+    SessionExtend(SessionExtendRequest),
+    #[serde(rename = "wc_sessionRequest")]
+    SessionRequest(SessionRequestRequest),
+    #[serde(rename = "wc_sessionEvent")]
+    SessionEvent(SessionEventRequest),
+    #[serde(rename = "wc_sessionDelete")]
+    SessionDelete(SessionDeleteRequest),
+    #[serde(rename = "wc_sessionPing")]
+    SessionPing(()),
 }
 
 impl_relay_protocol_metadata!(RequestParams, request);
@@ -374,12 +389,12 @@ pub enum ResponseParams {
 pub enum ResponseParamsSuccess {
     SessionPropose(SessionProposeResponse),
     SessionSettle(bool),
-    // SessionUpdate(bool),
-    // SessionExtend(bool),
-    // SessionRequest(bool),
-    // SessionEvent(bool),
-    // SessionDelete(bool),
-    // SessionPing(bool),
+    SessionUpdate(bool),
+    SessionExtend(bool),
+    SessionRequest(bool),
+    SessionEvent(bool),
+    SessionDelete(bool),
+    SessionPing(bool),
 }
 impl_relay_protocol_metadata!(ResponseParamsSuccess, response);
 impl_relay_protocol_helpers!(ResponseParamsSuccess);
@@ -412,12 +427,12 @@ pub struct ErrorParams {
 pub enum ResponseParamsError {
     SessionPropose(ErrorParams),
     SessionSettle(ErrorParams),
-    // SessionUpdate(ErrorParams),
-    // SessionExtend(ErrorParams),
-    // SessionRequest(ErrorParams),
-    // SessionEvent(ErrorParams),
-    // SessionDelete(ErrorParams),
-    // SessionPing(ErrorParams),
+    SessionUpdate(ErrorParams),
+    SessionExtend(ErrorParams),
+    SessionRequest(ErrorParams),
+    SessionEvent(ErrorParams),
+    SessionDelete(ErrorParams),
+    SessionPing(ErrorParams),
 }
 impl_relay_protocol_metadata!(ResponseParamsError, response);
 impl_relay_protocol_helpers!(ResponseParamsError);

@@ -15,11 +15,7 @@
 // pairing is considered expired, should be generated 5 minutes in the future
 
 use {
-    lazy_static::lazy_static,
-    regex::Regex,
-    std::{collections::HashMap, str::FromStr},
-    thiserror::Error,
-    url::Url,
+    lazy_static::lazy_static, regex::Regex, relay_rpc::domain::Topic, std::{collections::HashMap, str::FromStr}, thiserror::Error, url::Url
 };
 
 lazy_static! {
@@ -113,9 +109,6 @@ impl Pairing {
                 return Err(ParseError::UnexpectedParameter(key.into_owned(), existing));
             }
         }
-
-        let mapp = params.keys();
-        println!("{mapp:?}");
 
         let relay_protocol = params
             .remove("relay-protocol")

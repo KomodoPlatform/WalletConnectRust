@@ -3,7 +3,7 @@ use {
     chrono::Utc,
     clap::Parser,
     relay_client::{
-        error::{ClientError, Error},
+        error::ClientError,
         websocket::{Client, CloseFrame, ConnectionHandler, PublishedMessage},
         ConnectionOptions,
         MessageIdGenerator,
@@ -14,16 +14,7 @@ use {
         rpc::{
             params::{
                 session::{
-                    propose::{SessionProposeRequest, SessionProposeResponse},
-                    settle::{Controller, SessionSettleRequest},
-                    IrnMetadata,
-                    ProposeNamespace,
-                    ProposeNamespaces,
-                    RelayProtocolMetadata,
-                    RequestParams,
-                    ResponseParamsSuccess,
-                    SettleNamespace,
-                    SettleNamespaces,
+                    delete::SessionDeleteRequest, propose::{SessionProposeRequest, SessionProposeResponse}, settle::{Controller, SessionSettleRequest}, IrnMetadata, ProposeNamespace, ProposeNamespaces, RelayProtocolMetadata, RequestParams, ResponseParamsSuccess, SettleNamespace, SettleNamespaces
                 },
                 Metadata,
                 Relay,
@@ -222,14 +213,14 @@ async fn process_proposal_request(
     Ok(create_proposal_response(responder_public_key))
 }
 
-// fn process_session_delete_request(delete_params: SessionDeleteRequest) ->
-// ResponseParamsSuccess {     println!(
-//         "\nSession is being terminated reason={}, code={}",
-//         delete_params.message, delete_params.code,
-//     );
+fn process_session_delete_request(delete_params: SessionDeleteRequest) ->
+ResponseParamsSuccess {     println!(
+        "\nSession is being terminated reason={}, code={}",
+        delete_params.message, delete_params.code,
+    );
 
-//     ResponseParamsSuccess::SessionDelete(true)
-// }
+    ResponseParamsSuccess::SessionDelete(true)
+}
 
 async fn process_inbound_request(
     context: Arc<Mutex<Context>>,
@@ -241,11 +232,17 @@ async fn process_inbound_request(
         Params::SessionPropose(proposal) => {
             process_proposal_request(context.clone(), proposal).await?
         }
-        // RequestParams::SessionDelete(params) => {
-        //     session_delete_cleanup_required = Some(topic.clone());
-        //     process_session_delete_request(params)
-        // }
-        // RequestParams::SessionPing(_) => ResponseParamsSuccess::SessionPing(true),
+        Params::SessionRequest(request) => {
+            println!("params: {}", request.request.params);
+            println!("method: {}", request.request.method);
+
+            todo!()
+        }
+        Params::SessionDelete(params) => {
+            session_delete_cleanup_required = Some(topic.clone());
+            process_session_delete_request(params)
+        }
+        Params::SessionPing(_) => ResponseParamsSuccess::SessionPing(true),
         _ => todo!(),
     };
 
@@ -255,9 +252,9 @@ async fn process_inbound_request(
         .await?;
 
     // Corner case after the session was closed by the dapp.
-    // if let Some(topic) = session_delete_cleanup_required {
-    //     context.session_delete_cleanup(topic).await?
-    // }
+    if let Some(topic) = session_delete_cleanup_required {
+        context.session_delete_cleanup(topic).await?
+    }
 
     Ok(())
 }
@@ -440,6 +437,41 @@ impl Context {
 
         Ok(())
     }
+
+    /// Deletes session identified by the `topic`.
+       ///
+       /// When session count reaches zero, unsubscribes from topic and sends
+       /// termination signal to end the application execution.
+       ///
+       /// TODO: should really delete pairing as well:
+       /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/
+       /// rpc-methods#wc_pairingdelete
+       async fn session_delete_cleanup(&mut self, topic: Topic) -> Result<()> {
+           let _session = self
+               .sessions
+               .remove(&topic)
+               .ok_or_else(|| anyhow::anyhow!("Attempt to remove non-existing session"))?;
+
+           self.client
+               .unsubscribe(topic)
+               .await?;
+
+           // Un-pair when there are no more session subscriptions.
+           // TODO: Delete pairing, not just unsubscribe.
+           if self.sessions.is_empty() {
+               println!("\nNo active sessions left, terminating the pairing");
+
+               self.client
+                   .unsubscribe(
+                       self.pairing.topic.clone(),
+                   )
+                   .await?;
+
+               self.pairing.terminator.send(()).await?;
+           }
+
+           Ok(())
+       }
 }
 
 #[tokio::main]
