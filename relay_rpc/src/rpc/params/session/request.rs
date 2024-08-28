@@ -54,12 +54,12 @@ mod tests {
                 "method": "eth_signTransaction",
                 "params": [
                     {
-                        "from": "0x1456225dE90927193F7A171E64a600416f96f2C8",
-                        "to": "0x1456225dE90927193F7A171E64a600416f96f2C8",
                         "data": "0x",
-                        "nonce": "0x00",
-                        "gasPrice": "0xa72c",
+                        "from": "0x1456225dE90927193F7A171E64a600416f96f2C8",
                         "gasLimit": "0x5208",
+                        "gasPrice": "0xa72c",
+                        "nonce": "0x00",
+                        "to": "0x1456225dE90927193F7A171E64a600416f96f2C8",
                         "value": "0x00"
                     }
                 ]
