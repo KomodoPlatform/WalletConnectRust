@@ -5,5 +5,5 @@ mod session_key;
 pub use {
     crypto::*,
     pairing_uri::{Pairing, PairingParams},
-    session_key::*
+    session_key::*,
 };

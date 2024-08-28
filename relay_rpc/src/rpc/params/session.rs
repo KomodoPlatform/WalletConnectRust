@@ -301,13 +301,13 @@ macro_rules! impl_relay_protocol_metadata {
                 fn irn_metadata(&self) -> IrnMetadata {
                     match self {
                         [<$param_type>]::SessionPropose(_) => propose::[<IRN_ $meta:upper _METADATA>],
-                        [<$param_type>]::SessionSettle(_) => propose::[<IRN_ $meta:upper _METADATA>],
-                        [<$param_type>]::SessionRequest(_) => propose::[<IRN_ $meta:upper _METADATA>],
-                        [<$param_type>]::SessionUpdate(_) => propose::[<IRN_ $meta:upper _METADATA>],
-                        [<$param_type>]::SessionDelete(_) => propose::[<IRN_ $meta:upper _METADATA>],
-                        [<$param_type>]::SessionEvent(_) => propose::[<IRN_ $meta:upper _METADATA>],
-                        [<$param_type>]::SessionExtend(_) => propose::[<IRN_ $meta:upper _METADATA>],
-                        [<$param_type>]::SessionPing(_) => propose::[<IRN_ $meta:upper _METADATA>],
+                        [<$param_type>]::SessionSettle(_) => settle::[<IRN_ $meta:upper _METADATA>],
+                        [<$param_type>]::SessionRequest(_) => request::[<IRN_ $meta:upper _METADATA>],
+                        [<$param_type>]::SessionUpdate(_) => update::[<IRN_ $meta:upper _METADATA>],
+                        [<$param_type>]::SessionDelete(_) => delete::[<IRN_ $meta:upper _METADATA>],
+                        [<$param_type>]::SessionEvent(_) => event::[<IRN_ $meta:upper _METADATA>],
+                        [<$param_type>]::SessionExtend(_) => extend::[<IRN_ $meta:upper _METADATA>],
+                        [<$param_type>]::SessionPing(_) => ping::[<IRN_ $meta:upper _METADATA>],
                     }
                 }
             }
@@ -324,22 +324,32 @@ macro_rules! impl_relay_protocol_helpers {
                 type Params = Self;
 
                 fn irn_try_from_tag(value: Value, tag: u32) -> Result<Self::Params, ParamsError> {
-                    if tag == propose::IRN_RESPONSE_METADATA.tag {
-                        Ok(Self::SessionPropose(serde_json::from_value(value)?))
-                    } else if tag == settle::IRN_RESPONSE_METADATA.tag {
-                        Ok(Self::SessionSettle(serde_json::from_value(value)?))
-                    }  else if tag == request::IRN_RESPONSE_METADATA.tag {
-                        Ok(Self::SessionRequest(serde_json::from_value(value)?))
-                    }  else if tag == delete::IRN_RESPONSE_METADATA.tag {
-                        Ok(Self::SessionDelete(serde_json::from_value(value)?))
-                    }  else if tag == extend::IRN_RESPONSE_METADATA.tag {
-                        Ok(Self::SessionExtend(serde_json::from_value(value)?))
-                    }  else if tag == update::IRN_RESPONSE_METADATA.tag {
-                        Ok(Self::SessionUpdate(serde_json::from_value(value)?))
-                    }  else if tag == event::IRN_RESPONSE_METADATA.tag {
-                        Ok(Self::SessionEvent(serde_json::from_value(value)?))
-                    } else {
-                        Err(ParamsError::ResponseTag(tag))
+                    match tag {
+                        tag if tag == propose::IRN_RESPONSE_METADATA.tag => {
+                            Ok(Self::SessionPropose(serde_json::from_value(value)?))
+                        }
+                        tag if tag == settle::IRN_RESPONSE_METADATA.tag => {
+                            Ok(Self::SessionSettle(serde_json::from_value(value)?))
+                        }
+                        tag if tag == request::IRN_RESPONSE_METADATA.tag => {
+                            Ok(Self::SessionRequest(serde_json::from_value(value)?))
+                        }
+                        tag if tag == delete::IRN_RESPONSE_METADATA.tag => {
+                            Ok(Self::SessionDelete(serde_json::from_value(value)?))
+                        }
+                        tag if tag == extend::IRN_RESPONSE_METADATA.tag => {
+                            Ok(Self::SessionExtend(serde_json::from_value(value)?))
+                        }
+                        tag if tag == update::IRN_RESPONSE_METADATA.tag => {
+                            Ok(Self::SessionUpdate(serde_json::from_value(value)?))
+                        }
+                        tag if tag == event::IRN_RESPONSE_METADATA.tag => {
+                            Ok(Self::SessionEvent(serde_json::from_value(value)?))
+                        }
+                        tag if tag == event::IRN_RESPONSE_METADATA.tag => {
+                            Ok(Self::SessionPing(serde_json::from_value(value)?))
+                        }
+                        _ => Err(ParamsError::ResponseTag(tag)),
                     }
                 }
             }

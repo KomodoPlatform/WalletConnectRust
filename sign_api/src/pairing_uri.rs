@@ -164,7 +164,10 @@ pub enum ParseError {
     UnexpectedProtocol(String),
 }
 
+#[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn parse_uri() {
         let uri = "wc:c9e6d30fb34afe70a15c14e9337ba8e4d5a35dd695c39b94884b0ee60c69d168@2?\

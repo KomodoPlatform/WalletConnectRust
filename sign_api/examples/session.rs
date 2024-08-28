@@ -38,9 +38,11 @@ use {
         },
     },
     sign_api::{
-        crypto::{decode_and_decrypt_type0, encrypt_and_encode, EnvelopeType},
-        session::SessionKey,
+        decode_and_decrypt_type0,
+        encrypt_and_encode,
+        EnvelopeType,
         Pairing as PairingData,
+        SessionKey,
     },
     std::{
         collections::{BTreeMap, HashMap},
@@ -296,7 +298,7 @@ async fn process_inbound_message(
     message: PublishedMessage,
 ) -> Result<()> {
     let plain = {
-        let mut context = context.lock().await;
+        let context = context.lock().await;
         context.peek_sym_key(&message.topic, |key| {
             decode_and_decrypt_type0(message.message.as_bytes(), key)
                 .map_err(|e| anyhow::anyhow!(e))
@@ -328,6 +330,7 @@ async fn inbound_handler(context: Arc<Mutex<Context>>, message: PublishedMessage
 }
 
 /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing
+#[allow(dead_code)]
 struct Pairing {
     /// Termination signal for when all sessions have been closed.
     terminator: Sender<()>,
@@ -345,6 +348,7 @@ struct Pairing {
 /// https://specs.walletconnect.com/2.0/specs/clients/sign/session-proposal
 ///
 /// New session as the result of successful session proposal.
+#[allow(dead_code)]
 struct Session {
     /// Pairing subscription id.
     subscription_id: SubscriptionId,
