@@ -66,6 +66,7 @@ const SUPPORTED_METHODS: &[&str] = &[
     "eth_sign",
     "personal_sign",
     "eth_signTypedData",
+    "eth_signTypedData_v4"
 ];
 const SUPPORTED_CHAINS: &[&str] = &["eip155:1", "eip155:5"];
 const SUPPORTED_EVENTS: &[&str] = &["chainChanged", "accountsChanged"];
@@ -242,11 +243,29 @@ async fn process_inbound_request(
         Params::SessionPropose(proposal) => {
             process_proposal_request(context.clone(), proposal).await?
         }
-        Params::SessionRequest(request) => {
-            println!("params: {}", request.request.params);
-            println!("method: {}", request.request.method);
+        Params::SessionRequest(param) => {
+            // process sign tx request here
+            let message = param.request.params[0].as_str().unwrap();
+            let address = param.request.params[1].as_str().unwrap();
 
-            todo!()
+            // For testing purposes, we'll create a mock signature
+            let mock_signature = mock_sign(address, message);
+            let context = context.lock().await;
+            let response = Response::Success(SuccessfulResponse {
+                id: request.id,
+                jsonrpc: JSON_RPC_VERSION_STR.into(),
+                result: serde_json::to_value(mock_signature).unwrap(),
+            });
+            let payload = serde_json::to_string(&Payload::from(response))?;
+            println!("\nSending response topic={topic} payload={payload}");
+            const IRN_RESPONSE_METADATA: IrnMetadata = IrnMetadata {
+                tag: 1109,
+                ttl: 300,
+                prompt: false,
+            };
+            let _ = context.publish_payload(topic.clone(), IRN_RESPONSE_METADATA, &payload).await;
+
+            return Ok(());
         }
         Params::SessionDelete(params) => {
             session_delete_cleanup_required = Some(topic.clone());
@@ -267,6 +286,16 @@ async fn process_inbound_request(
     }
 
     Ok(())
+}
+
+fn mock_sign(address: &str, message: &str) -> String {
+    // Remove '0x' prefix if present
+    let message = message.strip_prefix("0x").unwrap_or(message);
+
+    // In a real implementation, we would sign the message here.
+    // For mocking purposes, we'll create a deterministic "signature" based on the inputs.
+    let mock_signature = ethers::utils::keccak256(format!("{:?}{}", address, message).as_bytes());
+    format!("0x{}", hex::encode(mock_signature))
 }
 
 fn process_inbound_response(response: Response) -> Result<()> {

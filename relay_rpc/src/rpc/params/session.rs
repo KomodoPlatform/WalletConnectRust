@@ -415,7 +415,7 @@ pub enum ResponseParamsSuccess {
     SessionRequest(bool),
     SessionEvent(bool),
     SessionDelete(bool),
-    SessionPing(bool),
+    SessionPing(bool)
 }
 impl_relay_protocol_metadata!(ResponseParamsSuccess, response);
 impl_relay_protocol_helpers!(ResponseParamsSuccess);
