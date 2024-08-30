@@ -35,11 +35,10 @@ pub trait RelayProtocolHelpers {
     fn irn_try_from_tag(value: Value, tag: u32) -> Result<Self::Params, ParamsError>;
 }
 
-
 /// Errors covering Sign API payload parameter conversion issues.
 #[derive(Debug, thiserror::Error)]
 pub enum ParamsError {
-    /// PAiring API serialization/deserialization issues.
+    /// Pairing API serialization/deserialization issues.
     #[error("Failure serializing/deserializing Sign API parameters: {0}")]
     Serde(#[from] serde_json::Error),
     /// Pairing API invalid response tag.

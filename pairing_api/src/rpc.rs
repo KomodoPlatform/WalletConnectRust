@@ -1,11 +1,16 @@
 mod methods;
 mod shared;
 
-use shared::{IrnMetadata, RelayProtocolHelpers, RelayProtocolMetadata};
-use methods::{pairing_delete::PairingDeleteRequest, pairing_extend::PairingExtendRequest, pairing_ping::PairingPingRequest};
-
-use paste::paste;
-use serde::{Deserialize, Serialize};
+use {
+    methods::{
+        pairing_delete::PairingDeleteRequest,
+        pairing_extend::PairingExtendRequest,
+        pairing_ping::PairingPingRequest,
+    },
+    paste::paste,
+    serde::{Deserialize, Serialize},
+    shared::{IrnMetadata, RelayProtocolHelpers, RelayProtocolMetadata},
+};
 
 // Convenience macro to de-duplicate implementation for different parameter
 // sets.

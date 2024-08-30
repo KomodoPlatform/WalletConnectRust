@@ -1,8 +1,10 @@
 //! https://specs.walletconnect.com/2.0/specs/clients/core/pairing/rpc-methods
 //! #wc_pairingdelete
 
-use serde::{Deserialize, Serialize};
-use crate::rpc::shared::IrnMetadata;
+use {
+    crate::rpc::shared::IrnMetadata,
+    serde::{Deserialize, Serialize},
+};
 
 pub(crate) const IRN_REQUEST_METADATA: IrnMetadata = IrnMetadata {
     tag: 1000,
