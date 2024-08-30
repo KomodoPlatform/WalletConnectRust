@@ -1,7 +1,26 @@
-use {
-    super::ErrorData,
-    std::fmt::{Debug, Display},
-};
+use std::fmt::{Debug, Display};
+use serde::{Deserialize, Serialize};
+
+
+/// Data structure representing error response params.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ErrorData {
+    /// Error code.
+    pub code: i32,
+
+    /// Error message.
+    pub message: String,
+
+    /// Error data, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
+}
+
+#[derive(Debug, thiserror::Error, strum::EnumString, strum::IntoStaticStr, PartialEq, Eq)]
+pub enum SubscriptionError {
+    #[error("Subscriber limit exceeded")]
+    SubscriberLimitExceeded,
+}
 
 /// Provides serialization to and from string tags. This has a blanket
 /// implementation for all error types that derive [`strum::EnumString`] and

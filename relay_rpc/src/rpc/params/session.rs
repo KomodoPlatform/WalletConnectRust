@@ -8,22 +8,11 @@ pub mod settle;
 pub mod update;
 
 use {
-    delete::SessionDeleteRequest,
-    event::SessionEventRequest,
-    extend::SessionExtendRequest,
-    paste::paste,
-    propose::{SessionProposeRequest, SessionProposeResponse},
-    regex::Regex,
-    request::SessionRequestRequest,
-    serde::{Deserialize, Serialize},
-    serde_json::Value,
-    settle::SessionSettleRequest,
-    std::{
+    crate::rpc::ErrorData, delete::SessionDeleteRequest, event::SessionEventRequest, extend::SessionExtendRequest, paste::paste, propose::{SessionProposeRequest, SessionProposeResponse}, regex::Regex, request::SessionRequestRequest, serde::{Deserialize, Serialize}, serde_json::Value, settle::SessionSettleRequest, std::{
         collections::{BTreeMap, BTreeSet},
         ops::Deref,
         sync::OnceLock,
-    },
-    update::SessionUpdateRequest,
+    }, update::SessionUpdateRequest
 };
 
 /// https://specs.walletconnect.com/2.0/specs/clients/sign/namespaces
@@ -428,32 +417,18 @@ impl TryFrom<ResponseParamsSuccess> for ResponseParams {
     }
 }
 
-/// Response error data.
-///
-/// The documentation states that both fields are required.
-/// However, on session expiry error, "empty" error is received.
-#[derive(Debug, Clone, Eq, Serialize, Deserialize, PartialEq)]
-pub struct ErrorParams {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
-    pub code: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
-    pub message: Option<String>,
-}
-
 /// Typed error response parameters.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ResponseParamsError {
-    SessionPropose(ErrorParams),
-    SessionSettle(ErrorParams),
-    SessionUpdate(ErrorParams),
-    SessionExtend(ErrorParams),
-    SessionRequest(ErrorParams),
-    SessionEvent(ErrorParams),
-    SessionDelete(ErrorParams),
-    SessionPing(ErrorParams),
+    SessionPropose(ErrorData),
+    SessionSettle(ErrorData),
+    SessionUpdate(ErrorData),
+    SessionExtend(ErrorData),
+    SessionRequest(ErrorData),
+    SessionEvent(ErrorData),
+    SessionDelete(ErrorData),
+    SessionPing(ErrorData),
 }
 impl_relay_protocol_metadata!(ResponseParamsError, response);
 impl_relay_protocol_helpers!(ResponseParamsError);

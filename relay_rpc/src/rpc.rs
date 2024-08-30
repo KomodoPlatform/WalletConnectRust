@@ -222,26 +222,6 @@ impl ErrorResponse {
     }
 }
 
-/// Data structure representing error response params.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ErrorData {
-    /// Error code.
-    pub code: i32,
-
-    /// Error message.
-    pub message: String,
-
-    /// Error data, if any.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<String>,
-}
-
-#[derive(Debug, thiserror::Error, strum::EnumString, strum::IntoStaticStr, PartialEq, Eq)]
-pub enum SubscriptionError {
-    #[error("Subscriber limit exceeded")]
-    SubscriberLimitExceeded,
-}
-
 /// Subscription request parameters. This request does not require the
 /// subscription to be fully processed, and returns as soon as the server
 /// receives it.
