@@ -9,7 +9,10 @@ use {
     std::{sync::Arc, time::Duration},
     structopt::StructOpt,
     tokio::{
-        signal, spawn, sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender}, time::sleep
+        signal,
+        spawn,
+        sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+        time::sleep,
     },
 };
 

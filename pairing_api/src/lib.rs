@@ -113,8 +113,10 @@ impl PairingClient {
             sym_key: sym_key.clone(),
             pairing: pairing_info,
         });
-        let mut pairings = self.pairings.lock().unwrap();
-        pairings.insert(topic.clone().to_string(), pairing);
+        {
+            let mut pairings = self.pairings.lock().unwrap();
+            pairings.insert(topic.clone().to_string(), pairing);
+        }
 
         println!("\nSubscribing to topic: {topic}");
         self.client
@@ -127,7 +129,6 @@ impl PairingClient {
     }
 
     pub fn pair(&self, uri: &str) -> Result<(), PairingClientError> {
-
         Ok(())
     }
 
@@ -142,7 +143,7 @@ impl PairingClient {
 
     pub fn get_pairing(&self, topic: &str) -> Option<Arc<Pairing>> {
         let pairings = self.pairings.lock().unwrap();
-        pairings.get(topic).map(|p| p.clone())
+        pairings.get(topic).cloned()
     }
 
     fn generate_uri(pairing: &PairingInfo, sym_key: &str) -> String {
