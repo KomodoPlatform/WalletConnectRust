@@ -142,7 +142,7 @@ where
 }
 
 /// Decodes and decrypts the Type0 envelope payload.
-pub fn decode_and_decrypt_type0<T>(msg: T, key: &SymKey) -> Result<String, PayloadError>
+pub fn decode_and_decrypt_type0<T>(msg: T, key: &[u8]) -> Result<String, PayloadError>
 where
     T: AsRef<[u8]>,
 {
@@ -180,7 +180,7 @@ fn encode(envelope_type: EnvelopeType, sealed: &[u8], init_vec: &InitVec) -> Str
     }
 }
 
-fn decrypt(nonce: &Nonce, payload: Payload<'_, '_>, key: &SymKey) -> Result<Vec<u8>, PayloadError> {
+fn decrypt(nonce: &Nonce, payload: Payload<'_, '_>, key: &[u8]) -> Result<Vec<u8>, PayloadError> {
     let cipher = ChaCha20Poly1305::new(key.into());
     let unsealed = cipher
         .decrypt(nonce, payload)
