@@ -1,9 +1,29 @@
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub mod pairing;
 pub mod pairing_delete;
 pub mod pairing_extend;
 pub mod pairing_ping;
+
+/// Metadata associated with a pairing.
+#[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct Metadata {
+    pub description: String,
+    pub url: String,
+    pub icons: Vec<String>,
+    pub name: String,
+}
+
+/// Information about the relay used for communication.
+#[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone, Default)]
+pub struct Relay {
+    pub protocol: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub data: Option<String>,
+}
 
 /// Relay IRN protocol metadata.
 ///

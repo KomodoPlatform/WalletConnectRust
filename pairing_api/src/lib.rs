@@ -11,6 +11,8 @@ use {
                 pairing_extend::PairingExtendRequest,
                 pairing_ping::PairingPingRequest,
                 IrnMetadata,
+                Metadata,
+                Relay,
                 RelayProtocolMetadata,
             },
             Payload,
@@ -24,17 +26,23 @@ use {
         collections::HashMap,
         sync::Arc,
         time::{Duration, SystemTime, UNIX_EPOCH},
-    }, tokio::sync::Mutex,
+    },
+    tokio::sync::Mutex,
 };
 
 pub mod crypto;
 pub mod pairing;
 
+/// Duration for short-term expiry (5 minutes).
 const EXPIRY_5_MINS: Duration = Duration::from_secs(250); // 5 mins
+/// Duration for long-term expiry (30 days).
 const EXPIRY_30_DAYS: Duration = Duration::from_secs(30 * 60); // 5 mins
+/// The relay protocol used for WalletConnect communications.
 const RELAY_PROTOCOL: &str = "irn";
-const VERSION: &str = "2.0";
+/// The version of the WalletConnect protocol.
+const VERSION: &str = "2";
 
+/// Errors that can occur during pairing operations.
 #[derive(Debug, thiserror::Error)]
 pub enum PairingClientError {
     #[error("Subscription error")]
@@ -49,23 +57,7 @@ pub enum PairingClientError {
     EncodeError(String),
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct Metadata {
-    pub description: String,
-    pub url: String,
-    pub icons: Vec<String>,
-    pub name: String,
-}
-
-#[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone, Default)]
-pub struct Relay {
-    pub protocol: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
-    pub data: Option<String>,
-}
-
+/// Detailed information about a pairing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PairingInfo {
@@ -77,6 +69,7 @@ pub struct PairingInfo {
     pub methods: Vec<Vec<String>>,
 }
 
+/// Represents a complete pairing including symmetric key and version.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Pairing {
@@ -85,6 +78,7 @@ pub struct Pairing {
     pairing: PairingInfo,
 }
 
+/// Client for managing WalletConnect pairings.
 #[derive(Debug)]
 pub struct PairingClient {
     client: Arc<Client>,
@@ -99,7 +93,9 @@ impl PairingClient {
         }
     }
 
-    /// returns Self, Topic, Uri
+    /// Attempts to generate a new pairing, stores it in the client's pairing
+    /// list, subscribes to the pairing topic, and returns the necessary
+    /// information to establish a connection.
     pub async fn try_create(
         &self,
         metadata: Metadata,
@@ -133,16 +129,19 @@ impl PairingClient {
             version: VERSION.to_owned(),
             pairing: pairing_info,
         };
+        // Use a block to ensure the mutex is released as soon as possible
         {
             let mut pairings = self.pairings.lock().await;
             pairings.insert(topic.clone().to_string(), pairing);
         }
 
         println!("\nSubscribing to topic: {topic}");
+
         self.client
             .subscribe(topic.clone())
             .await
             .map_err(PairingClientError::SubscriptionError)?;
+
         println!("\nSubscribed to topic: {topic}");
 
         Ok((topic.to_string(), uri))
@@ -152,6 +151,7 @@ impl PairingClient {
         todo!()
     }
 
+    /// Retrieves the symmetric key for a given pairing topic.
     pub async fn sym_key(&self, topic: &str) -> Result<String, PairingClientError> {
         let pairings = self.pairings.lock().await;
         if let Some(key) = pairings.get(topic) {
@@ -161,38 +161,49 @@ impl PairingClient {
         Err(PairingClientError::PairingNotFound)
     }
 
+    /// Retrieves the full pairing information for a given topic.
     pub async fn get_pairing(&self, topic: &str) -> Option<Pairing> {
         let pairings = self.pairings.lock().await;
         pairings.get(topic).cloned()
     }
 
+    /// Activates the pairing associated with the given topic,
+    /// extends its expiry time, and sends a pairing extend request to the peer.
     pub async fn activate(&self, topic: &str) -> Result<(), PairingClientError> {
         let mut pairings = self.pairings.lock().await;
+        let pairing = pairings
+            .get_mut(topic)
+            .ok_or_else(|| PairingClientError::PairingNotFound)?;
+
+        let now = SystemTime::now();
+        let expiry = now + EXPIRY_30_DAYS;
+        let expiry = expiry
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+
+        // try to extend session before updating local store.
+        let sym_key = hex::decode(pairing.sym_key.clone()).map_err(|err| {
+            PairingClientError::EncodeError(format!("Failed to decode sym_key: {:?}", err))
+        })?;
+        let ping_request = PairingRequestParams::PairingExtend(PairingExtendRequest { expiry });
+        let irn_metadata = ping_request.irn_metadata();
+
+        // Release the mutex lock before the async operation
+        drop(pairings);
+        self.publish_request(topic, ping_request, irn_metadata, &sym_key)
+            .await?;
+
+        // Re-acquire the lock to update the pairing
+        let mut pairings = self.pairings.lock().await;
         if let Some(pairing) = pairings.get_mut(topic) {
-            let now = SystemTime::now();
-            let expiry = now + EXPIRY_30_DAYS;
-            let expiry = expiry
-                .duration_since(UNIX_EPOCH)
-                .expect("Time went backwards")
-                .as_secs();
-
-            // try to extend session before updating local store.
-            let sym_key = hex::decode(pairing.sym_key.clone()).map_err(|err| {
-                PairingClientError::EncodeError(format!("Failed to decode sym_key: {:?}", err))
-            })?;
-            let ping_request = PairingRequestParams::PairingExtend(PairingExtendRequest { expiry });
-            let irn_metadata = ping_request.irn_metadata();
-            self.publish_request(topic, ping_request, irn_metadata, &sym_key)
-                .await?;
-
-            // update local store.
             pairing.pairing.active = true;
             pairing.pairing.expiry = expiry;
 
-            return Ok(());
+            Ok(())
+        } else {
+            Err(PairingClientError::PairingNotFound)
         }
-
-        Err(PairingClientError::PairingNotFound)
     }
 
     pub async fn update_expiry(&self, topic: &str, expiry: u64) {
@@ -242,7 +253,7 @@ impl PairingClient {
             return Ok(());
         }
 
-       Err(PairingClientError::PairingNotFound)
+        Err(PairingClientError::PairingNotFound)
     }
 
     pub async fn delete_request(&self, topic: &str) -> Result<(), PairingClientError> {
@@ -257,7 +268,7 @@ impl PairingClient {
                 PairingClientError::EncodeError(format!("Failed to decode sym_key: {:?}", err))
             })?;
             let delete_request = PairingRequestParams::PairingDelete(PairingDeleteRequest {
-                code: 600,
+                code: 6000,
                 message: "User requested disconnect".to_owned(),
             });
             let irn_metadata = delete_request.irn_metadata();
@@ -267,7 +278,7 @@ impl PairingClient {
             return Ok(());
         }
 
-       Err(PairingClientError::PairingNotFound)
+        Err(PairingClientError::PairingNotFound)
     }
 
     /// Function to publish a request

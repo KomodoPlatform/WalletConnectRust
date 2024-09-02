@@ -1,11 +1,14 @@
 use {
-    pairing_api::{crypto::decode_and_decrypt_type0, Metadata, PairingClient},
+    pairing_api::{crypto::decode_and_decrypt_type0, PairingClient},
     relay_client::{
         error::ClientError,
         websocket::{Client, CloseFrame, ConnectionHandler, PublishedMessage},
         ConnectionOptions,
     },
-    relay_rpc::auth::{ed25519_dalek::SigningKey, AuthToken},
+    relay_rpc::{
+        auth::{ed25519_dalek::SigningKey, AuthToken},
+        rpc::params::Metadata,
+    },
     std::{sync::Arc, time::Duration},
     structopt::StructOpt,
     tokio::{
@@ -79,10 +82,7 @@ impl ConnectionHandler for Handler {
 }
 
 fn prepare_pairing_client_data() -> (Vec<Vec<String>>, Metadata) {
-    let methods = vec![vec!["wc_sessionPropose".to_string()], vec![
-        "wc_authRequestDP".to_string(),
-        "wc_authBatchRequest".to_string(),
-    ]];
+    let methods = vec![vec!["wc_authRequest".to_string()]];
     let metadata = Metadata {
         description: "A decentralized application that enables secure communication and \
                       transactions."
