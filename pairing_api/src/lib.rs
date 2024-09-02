@@ -7,6 +7,8 @@ use {
         rpc::{
             params::{
                 pairing::PairingRequestParams,
+                pairing_delete::PairingDeleteRequest,
+                pairing_extend::PairingExtendRequest,
                 pairing_ping::PairingPingRequest,
                 IrnMetadata,
                 RelayProtocolMetadata,
@@ -20,9 +22,9 @@ use {
     serde::{Deserialize, Serialize},
     std::{
         collections::HashMap,
-        sync::{Arc, Mutex},
+        sync::Arc,
         time::{Duration, SystemTime, UNIX_EPOCH},
-    },
+    }, tokio::sync::Mutex,
 };
 
 pub mod crypto;
@@ -75,6 +77,7 @@ pub struct PairingInfo {
     pub methods: Vec<Vec<String>>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Pairing {
     sym_key: String,
@@ -131,7 +134,7 @@ impl PairingClient {
             pairing: pairing_info,
         };
         {
-            let mut pairings = self.pairings.lock().unwrap();
+            let mut pairings = self.pairings.lock().await;
             pairings.insert(topic.clone().to_string(), pairing);
         }
 
@@ -149,8 +152,8 @@ impl PairingClient {
         todo!()
     }
 
-    pub fn sym_key(&self, topic: &str) -> Result<String, PairingClientError> {
-        let pairings = self.pairings.lock().unwrap();
+    pub async fn sym_key(&self, topic: &str) -> Result<String, PairingClientError> {
+        let pairings = self.pairings.lock().await;
         if let Some(key) = pairings.get(topic) {
             return Ok(key.sym_key.to_owned());
         };
@@ -158,13 +161,13 @@ impl PairingClient {
         Err(PairingClientError::PairingNotFound)
     }
 
-    pub fn get_pairing(&self, topic: &str) -> Option<Pairing> {
-        let pairings = self.pairings.lock().unwrap();
+    pub async fn get_pairing(&self, topic: &str) -> Option<Pairing> {
+        let pairings = self.pairings.lock().await;
         pairings.get(topic).cloned()
     }
 
-    pub fn activate(&self, topic: &str) {
-        let mut pairings = self.pairings.lock().unwrap();
+    pub async fn activate(&self, topic: &str) -> Result<(), PairingClientError> {
+        let mut pairings = self.pairings.lock().await;
         if let Some(pairing) = pairings.get_mut(topic) {
             let now = SystemTime::now();
             let expiry = now + EXPIRY_30_DAYS;
@@ -172,20 +175,35 @@ impl PairingClient {
                 .duration_since(UNIX_EPOCH)
                 .expect("Time went backwards")
                 .as_secs();
+
+            // try to extend session before updating local store.
+            let sym_key = hex::decode(pairing.sym_key.clone()).map_err(|err| {
+                PairingClientError::EncodeError(format!("Failed to decode sym_key: {:?}", err))
+            })?;
+            let ping_request = PairingRequestParams::PairingExtend(PairingExtendRequest { expiry });
+            let irn_metadata = ping_request.irn_metadata();
+            self.publish_request(topic, ping_request, irn_metadata, &sym_key)
+                .await?;
+
+            // update local store.
             pairing.pairing.active = true;
             pairing.pairing.expiry = expiry;
+
+            return Ok(());
         }
+
+        Err(PairingClientError::PairingNotFound)
     }
 
-    pub fn update_expiry(&self, topic: &str, expiry: u64) {
-        let mut pairings = self.pairings.lock().unwrap();
+    pub async fn update_expiry(&self, topic: &str, expiry: u64) {
+        let mut pairings = self.pairings.lock().await;
         if let Some(pairing) = pairings.get_mut(topic) {
             pairing.pairing.expiry = expiry;
         }
     }
 
-    pub fn update_metadata(&self, topic: &str, metadata: Metadata) {
-        let mut pairings = self.pairings.lock().unwrap();
+    pub async fn update_metadata(&self, topic: &str, metadata: Metadata) {
+        let mut pairings = self.pairings.lock().await;
         if let Some(pairing) = pairings.get_mut(topic) {
             pairing.pairing.peer_metadata = metadata;
         }
@@ -199,30 +217,60 @@ impl PairingClient {
                 .map_err(PairingClientError::SubscriptionError)?;
         };
 
-        let mut pairings = self.pairings.lock().unwrap();
+        let mut pairings = self.pairings.lock().await;
         pairings.remove(topic);
 
         Ok(())
     }
 
-    pub async fn ping(&self, topic: &str) -> Result<(), PairingClientError> {
+    pub async fn ping_request(&self, topic: &str) -> Result<(), PairingClientError> {
+        println!("Attempting to ping topic: {}", topic);
         let pairing = {
-            let pairings = self.pairings.lock().unwrap();
+            let pairings = self.pairings.lock().await;
             pairings.get(topic).cloned()
         };
 
         if let Some(pairing) = pairing {
-            let sym_key = hex::decode(pairing.sym_key.clone())
-                .map_err(|err| PairingClientError::EncodeError(err.to_string()))?;
+            let sym_key = hex::decode(pairing.sym_key.clone()).map_err(|err| {
+                PairingClientError::EncodeError(format!("Failed to decode sym_key: {:?}", err))
+            })?;
             let ping_request = PairingRequestParams::PairingPing(PairingPingRequest {});
             let irn_metadata = ping_request.irn_metadata();
             self.publish_request(topic, ping_request, irn_metadata, &sym_key)
                 .await?;
+
+            return Ok(());
         }
 
-        Ok(())
+       Err(PairingClientError::PairingNotFound)
     }
 
+    pub async fn delete_request(&self, topic: &str) -> Result<(), PairingClientError> {
+        println!("Attempting to ping topic: {}", topic);
+        let pairing = {
+            let pairings = self.pairings.lock().await;
+            pairings.get(topic).cloned()
+        };
+
+        if let Some(pairing) = pairing {
+            let sym_key = hex::decode(pairing.sym_key.clone()).map_err(|err| {
+                PairingClientError::EncodeError(format!("Failed to decode sym_key: {:?}", err))
+            })?;
+            let delete_request = PairingRequestParams::PairingDelete(PairingDeleteRequest {
+                code: 600,
+                message: "User requested disconnect".to_owned(),
+            });
+            let irn_metadata = delete_request.irn_metadata();
+            self.publish_request(topic, delete_request, irn_metadata, &sym_key)
+                .await?;
+
+            return Ok(());
+        }
+
+       Err(PairingClientError::PairingNotFound)
+    }
+
+    /// Function to publish a request
     async fn publish_request(
         &self,
         topic: &str,
@@ -239,6 +287,8 @@ impl PairingClient {
             .map_err(|err| PairingClientError::EncodeError(err.to_string()))?;
 
         println!("\nOutbound encrypted payload={message}");
+
+        // Publish the encrypted message
         {
             self.client
                 .publish(
@@ -253,9 +303,12 @@ impl PairingClient {
                 .map_err(PairingClientError::PingError)?;
         };
 
+        println!("\nOutbound payload sent!");
+
         Ok(())
     }
 
+    /// Function to generate a WalletConnect URI
     fn generate_uri(pairing: &PairingInfo, sym_key: &str) -> String {
         let methods_str = pairing
             .methods

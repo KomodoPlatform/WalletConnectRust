@@ -21,6 +21,5 @@ pub(crate) const IRN_RESPONSE_METADATA: IrnMetadata = IrnMetadata {
 #[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PairingExtendRequest {
-    pub code: i64,
-    pub message: String,
+    pub expiry: u64,
 }

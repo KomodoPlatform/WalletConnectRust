@@ -12,7 +12,6 @@ use {
         signal,
         spawn,
         sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
-        time::sleep,
     },
 };
 
@@ -114,7 +113,7 @@ async fn main() -> anyhow::Result<()> {
     let (topic, uri) = pairing_client.try_create(metadata, methods).await.unwrap();
     println!("{uri:?}");
 
-    let key = pairing_client.sym_key(&topic).unwrap();
+    let key = pairing_client.sym_key(&topic).await.unwrap();
     let receiver_handle = spawn(spawn_published_message_recv_loop(receiver, key));
 
     // Keep the main task running
