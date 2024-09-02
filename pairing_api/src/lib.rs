@@ -1,7 +1,22 @@
 use {
+    crypto::encrypt_and_encode,
     rand::{rngs::OsRng, RngCore},
-    relay_client::websocket::Client,
-    relay_rpc::{domain::Topic, rpc::SubscriptionError},
+    relay_client::{websocket::Client, MessageIdGenerator},
+    relay_rpc::{
+        domain::Topic,
+        rpc::{
+            params::{
+                pairing::PairingRequestParams,
+                pairing_ping::PairingPingRequest,
+                IrnMetadata,
+                RelayProtocolMetadata,
+            },
+            Payload,
+            PublishError,
+            Request,
+            SubscriptionError,
+        },
+    },
     serde::{Deserialize, Serialize},
     std::{
         collections::HashMap,
@@ -12,9 +27,9 @@ use {
 
 pub mod crypto;
 pub mod pairing;
-pub mod rpc;
 
-const EXPIRY: Duration = Duration::from_secs(250); // 5 mins
+const EXPIRY_5_MINS: Duration = Duration::from_secs(250); // 5 mins
+const EXPIRY_30_DAYS: Duration = Duration::from_secs(30 * 60); // 5 mins
 const RELAY_PROTOCOL: &str = "irn";
 const VERSION: &str = "2.0";
 
@@ -26,6 +41,10 @@ pub enum PairingClientError {
     PairingNotFound,
     #[error("Pairing with topic already exists")]
     PairingTopicAlreadyExits,
+    #[error("PublishError error")]
+    PingError(relay_client::error::Error<PublishError>),
+    #[error("Encode error")]
+    EncodeError(String),
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone, Default)]
@@ -51,22 +70,22 @@ pub struct PairingInfo {
     pub topic: String,
     pub relay: Relay,
     pub peer_metadata: Metadata,
-    pub expiry: Option<u64>,
+    pub expiry: u64,
     pub active: bool,
     pub methods: Vec<Vec<String>>,
-    pub version: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct Pairing {
     sym_key: String,
+    version: String,
     pairing: PairingInfo,
 }
 
 #[derive(Debug)]
 pub struct PairingClient {
     client: Arc<Client>,
-    pub pairings: Arc<Mutex<HashMap<String, Arc<Pairing>>>>,
+    pub pairings: Arc<Mutex<HashMap<String, Pairing>>>,
 }
 
 impl PairingClient {
@@ -84,13 +103,11 @@ impl PairingClient {
         methods: Vec<Vec<String>>,
     ) -> Result<(String, String), PairingClientError> {
         let now = SystemTime::now();
-        let expiry = now + EXPIRY;
-        let expiry = Some(
-            expiry
-                .duration_since(UNIX_EPOCH)
-                .expect("Time went backwards")
-                .as_secs(),
-        );
+        let expiry = now + EXPIRY_5_MINS;
+        let expiry = expiry
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
 
         let topic = Topic::generate();
         let relay = Relay {
@@ -105,14 +122,14 @@ impl PairingClient {
             relay,
             topic: topic.clone().to_string(),
             peer_metadata: metadata,
-            version: VERSION.to_owned(),
         };
-        let uri = Self::generate_uri(&pairing_info, &sym_key);
 
-        let pairing = Arc::new(Pairing {
+        let uri = Self::generate_uri(&pairing_info, &sym_key);
+        let pairing = Pairing {
             sym_key: sym_key.clone(),
+            version: VERSION.to_owned(),
             pairing: pairing_info,
-        });
+        };
         {
             let mut pairings = self.pairings.lock().unwrap();
             pairings.insert(topic.clone().to_string(), pairing);
@@ -128,8 +145,8 @@ impl PairingClient {
         Ok((topic.to_string(), uri))
     }
 
-    pub fn pair(&self, uri: &str) -> Result<(), PairingClientError> {
-        Ok(())
+    pub fn pair(&self, _uri: &str) -> Result<(), PairingClientError> {
+        todo!()
     }
 
     pub fn sym_key(&self, topic: &str) -> Result<String, PairingClientError> {
@@ -141,9 +158,102 @@ impl PairingClient {
         Err(PairingClientError::PairingNotFound)
     }
 
-    pub fn get_pairing(&self, topic: &str) -> Option<Arc<Pairing>> {
+    pub fn get_pairing(&self, topic: &str) -> Option<Pairing> {
         let pairings = self.pairings.lock().unwrap();
         pairings.get(topic).cloned()
+    }
+
+    pub fn activate(&self, topic: &str) {
+        let mut pairings = self.pairings.lock().unwrap();
+        if let Some(pairing) = pairings.get_mut(topic) {
+            let now = SystemTime::now();
+            let expiry = now + EXPIRY_30_DAYS;
+            let expiry = expiry
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs();
+            pairing.pairing.active = true;
+            pairing.pairing.expiry = expiry;
+        }
+    }
+
+    pub fn update_expiry(&self, topic: &str, expiry: u64) {
+        let mut pairings = self.pairings.lock().unwrap();
+        if let Some(pairing) = pairings.get_mut(topic) {
+            pairing.pairing.expiry = expiry;
+        }
+    }
+
+    pub fn update_metadata(&self, topic: &str, metadata: Metadata) {
+        let mut pairings = self.pairings.lock().unwrap();
+        if let Some(pairing) = pairings.get_mut(topic) {
+            pairing.pairing.peer_metadata = metadata;
+        }
+    }
+
+    pub async fn delete_pairing(&self, topic: &str) -> Result<(), PairingClientError> {
+        {
+            self.client
+                .unsubscribe(topic.into())
+                .await
+                .map_err(PairingClientError::SubscriptionError)?;
+        };
+
+        let mut pairings = self.pairings.lock().unwrap();
+        pairings.remove(topic);
+
+        Ok(())
+    }
+
+    pub async fn ping(&self, topic: &str) -> Result<(), PairingClientError> {
+        let pairing = {
+            let pairings = self.pairings.lock().unwrap();
+            pairings.get(topic).cloned()
+        };
+
+        if let Some(pairing) = pairing {
+            let sym_key = hex::decode(pairing.sym_key.clone())
+                .map_err(|err| PairingClientError::EncodeError(err.to_string()))?;
+            let ping_request = PairingRequestParams::PairingPing(PairingPingRequest {});
+            let irn_metadata = ping_request.irn_metadata();
+            self.publish_request(topic, ping_request, irn_metadata, &sym_key)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn publish_request(
+        &self,
+        topic: &str,
+        params: PairingRequestParams,
+        irn_metadata: IrnMetadata,
+        key: &[u8],
+    ) -> Result<(), PairingClientError> {
+        let message_id = MessageIdGenerator::new().next();
+        let request = Request::new(message_id, params.into());
+        let payload = serde_json::to_string(&Payload::Request(request))
+            .map_err(|err| PairingClientError::EncodeError(err.to_string()))?;
+        let message = encrypt_and_encode(crypto::EnvelopeType::Type0, payload, key)
+            .map_err(|e| anyhow::anyhow!(e))
+            .map_err(|err| PairingClientError::EncodeError(err.to_string()))?;
+
+        println!("\nOutbound encrypted payload={message}");
+        {
+            self.client
+                .publish(
+                    topic.into(),
+                    message,
+                    None,
+                    irn_metadata.tag,
+                    Duration::from_secs(irn_metadata.ttl),
+                    irn_metadata.prompt,
+                )
+                .await
+                .map_err(PairingClientError::PingError)?;
+        };
+
+        Ok(())
     }
 
     fn generate_uri(pairing: &PairingInfo, sym_key: &str) -> String {
@@ -153,15 +263,12 @@ impl PairingClient {
             .map(|method_group| format!("[{}]", method_group.join(",")))
             .collect::<Vec<_>>()
             .join(",");
-        let expiry_timestamp_str = match pairing.expiry {
-            Some(ts) => ts.to_string(),
-            None => "".to_string(),
-        };
+        let expiry_timestamp_str = pairing.expiry.to_string();
 
         format!(
             "wc:{}@{}?symKey={}&methods={}&relay-protocol={}&expiryTimestamp={}",
             pairing.topic,
-            pairing.version,
+            VERSION,
             sym_key,
             methods_str,
             pairing.relay.protocol,

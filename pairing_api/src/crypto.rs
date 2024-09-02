@@ -119,7 +119,7 @@ impl<'a> EncodingParams<'a> {
 pub fn encrypt_and_encode<T>(
     envelope_type: EnvelopeType,
     msg: T,
-    key: &SymKey,
+    key: &[u8],
 ) -> Result<String, PayloadError>
 where
     T: AsRef<[u8]>,
@@ -161,7 +161,7 @@ where
     Ok(String::from_utf8(decrypted)?)
 }
 
-fn encrypt(nonce: &Nonce, payload: Payload<'_, '_>, key: &SymKey) -> Result<Vec<u8>, PayloadError> {
+fn encrypt(nonce: &Nonce, payload: Payload<'_, '_>, key: &[u8]) -> Result<Vec<u8>, PayloadError> {
     let cipher = ChaCha20Poly1305::new(key.into());
     let sealed = cipher
         .encrypt(nonce, payload)

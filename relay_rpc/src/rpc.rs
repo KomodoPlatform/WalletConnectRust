@@ -3,6 +3,11 @@
 
 use {
     crate::domain::{DidKey, MessageId, SubscriptionId, Topic},
+    params::{
+        pairing_delete::PairingDeleteRequest,
+        pairing_extend::PairingExtendRequest,
+        pairing_ping::PairingPingRequest,
+    },
     serde::{de::DeserializeOwned, Deserialize, Serialize},
     std::{fmt::Debug, sync::Arc},
 };
@@ -10,6 +15,7 @@ pub use {error::*, watch::*};
 
 pub mod error;
 pub mod msg_id;
+pub mod params;
 #[cfg(test)]
 mod tests;
 pub mod watch;
@@ -808,6 +814,15 @@ pub enum Params {
     /// topic the data is published for.
     #[serde(rename = "irn_subscription", alias = "iridium_subscription")]
     Subscription(Subscription),
+
+    #[serde(rename = "wc_pairingExtend")]
+    PairingExtend(PairingExtendRequest),
+
+    #[serde(rename = "wc_pairingDelete")]
+    PairingDelete(PairingDeleteRequest),
+
+    #[serde(rename = "wc_pairingPing")]
+    PairingPing(PairingPingRequest),
 }
 
 /// Data structure representing a JSON RPC request.
@@ -858,6 +873,7 @@ impl Request {
             Params::WatchRegister(params) => params.validate(),
             Params::WatchUnregister(params) => params.validate(),
             Params::Subscription(params) => params.validate(),
+            _ => Ok(()),
         }
     }
 }
