@@ -86,11 +86,11 @@ pub struct PairingClient {
 }
 
 impl PairingClient {
-    pub fn new(client: Arc<Client>) -> Self {
-        Self {
+    pub fn new(client: Arc<Client>) -> Arc<Self> {
+        Arc::new(Self {
             client,
             pairings: Arc::new(HashMap::new().into()),
-        }
+        })
     }
 
     /// Attempts to generate a new pairing, stores it in the client's pairing
@@ -234,6 +234,8 @@ impl PairingClient {
         Ok(())
     }
 
+    /// Used to evaluate if peer is currently online. Timeout at 30 seconds
+    /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/rpc-methods#wc_pairingping
     pub async fn ping_request(&self, topic: &str) -> Result<(), PairingClientError> {
         println!("Attempting to ping topic: {}", topic);
         let pairing = {
@@ -256,8 +258,13 @@ impl PairingClient {
         Err(PairingClientError::PairingNotFound)
     }
 
+    /// Used to inform the peer to close and delete a pairing.
+    /// The associated authentication state of the given
+    /// pairing must also be deleted.
+    ///
+    /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/rpc-methods#wc_pairingdelete
     pub async fn delete_request(&self, topic: &str) -> Result<(), PairingClientError> {
-        println!("Attempting to ping topic: {}", topic);
+        println!("Attempting to delete topic: {}", topic);
         let pairing = {
             let pairings = self.pairings.lock().await;
             pairings.get(topic).cloned()
@@ -273,6 +280,39 @@ impl PairingClient {
             });
             let irn_metadata = delete_request.irn_metadata();
             self.publish_request(topic, delete_request, irn_metadata, &sym_key)
+                .await?;
+
+            return Ok(());
+        }
+
+        Err(PairingClientError::PairingNotFound)
+    }
+
+    /// Used to update the lifetime of a pairing.
+    /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/rpc-methods#wc_pairingextend
+    pub async fn extend_request(&self, topic: &str, expiry: u64) -> Result<(), PairingClientError> {
+        println!("Attempting to extend topic: {}", topic);
+        let pairing = {
+            let pairings = self.pairings.lock().await;
+            pairings.get(topic).cloned()
+        };
+
+        if let Some(pairing) = pairing {
+            let sym_key = hex::decode(pairing.sym_key.clone()).map_err(|err| {
+                PairingClientError::EncodeError(format!("Failed to decode sym_key: {:?}", err))
+            })?;
+
+            let now = SystemTime::now();
+            let expiry = now + Duration::from_secs(expiry);
+            let expiry = expiry
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs();
+            let extend_request =
+                PairingRequestParams::PairingExtend(PairingExtendRequest { expiry });
+            let irn_metadata = extend_request.irn_metadata();
+
+            self.publish_request(topic, extend_request, irn_metadata, &sym_key)
                 .await?;
 
             return Ok(());
