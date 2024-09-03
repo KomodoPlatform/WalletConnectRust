@@ -188,9 +188,6 @@ impl PairingClient {
         })?;
         let ping_request = PairingRequestParams::PairingExtend(PairingExtendRequest { expiry });
         let irn_metadata = ping_request.irn_metadata();
-
-        // Release the mutex lock before the async operation
-        drop(pairings);
         self.publish_request(topic, ping_request, irn_metadata, &sym_key)
             .await?;
 
@@ -221,6 +218,7 @@ impl PairingClient {
     }
 
     pub async fn delete_pairing(&self, topic: &str) -> Result<(), PairingClientError> {
+        println!("Attempting to unsubscribe from topic: {topic}");
         {
             self.client
                 .unsubscribe(topic.into())
@@ -231,6 +229,7 @@ impl PairingClient {
         let mut pairings = self.pairings.lock().await;
         pairings.remove(topic);
 
+        println!("Unsubscribed from topic: {topic}");
         Ok(())
     }
 
@@ -354,7 +353,7 @@ impl PairingClient {
                 .map_err(PairingClientError::PingError)?;
         };
 
-        println!("\nOutbound payload sent!");
+        println!("\nOutbound request sent!");
 
         Ok(())
     }
@@ -382,9 +381,7 @@ impl PairingClient {
 }
 
 fn gen_sym_key() -> String {
-    let mut sym_key = [0u8; 32]; // 32 bytes = 256 bits
-    OsRng.fill_bytes(&mut sym_key); // Fill the array with secure random bytes
-
-    // Convert the sym_key to a hexadecimal string
+    let mut sym_key = [0u8; 32];
+    OsRng.fill_bytes(&mut sym_key);
     hex::encode(sym_key)
 }

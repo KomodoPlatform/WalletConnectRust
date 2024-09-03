@@ -7,7 +7,7 @@ use {
     },
     relay_rpc::{
         auth::{ed25519_dalek::SigningKey, AuthToken},
-        rpc::params::Metadata,
+        rpc::{params::Metadata, Params, Payload},
     },
     std::{sync::Arc, time::Duration},
     structopt::StructOpt,
@@ -114,7 +114,11 @@ async fn main() -> anyhow::Result<()> {
     println!("{uri:?}");
 
     let key = pairing_client.sym_key(&topic).await.unwrap();
-    let receiver_handle = spawn(spawn_published_message_recv_loop(receiver, key));
+    let receiver_handle = spawn(spawn_published_message_recv_loop(
+        pairing_client,
+        receiver,
+        key,
+    ));
 
     // Keep the main task running
     tokio::select! {
@@ -130,12 +134,27 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn spawn_published_message_recv_loop(
+    pairing_client: Arc<PairingClient>,
     mut recv: UnboundedReceiver<PublishedMessage>,
     key: String,
 ) {
     while let Some(msg) = recv.recv().await {
+        let topic = msg.topic.to_string();
         let key = hex::decode(key.clone()).unwrap();
         let message = decode_and_decrypt_type0(msg.message.as_bytes(), &key).unwrap();
-        println!("decoded message=({message})");
+        let reponse = serde_json::from_str::<Payload>(&message).unwrap();
+        match reponse {
+            Payload::Request(value) => match value.params {
+                Params::PairingDelete(_) => pairing_client.delete_pairing(&topic).await.unwrap(),
+                Params::PairingExtend(req) => {
+                    pairing_client.update_expiry(&topic, req.expiry).await
+                }
+                Params::PairingPing(_) => pairing_client.ping_request(&topic).await.unwrap(),
+                _ => unimplemented!(),
+            },
+            Payload::Response(value) => {
+                println!("Response: {value:?}");
+            }
+        }
     }
 }
