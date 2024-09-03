@@ -31,7 +31,6 @@ use {
 };
 
 pub mod crypto;
-pub mod pairing;
 
 /// Duration for short-term expiry (5 minutes).
 const EXPIRY_5_MINS: Duration = Duration::from_secs(250); // 5 mins
