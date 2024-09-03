@@ -1,5 +1,7 @@
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use {
+    serde::{Deserialize, Serialize},
+    serde_json::Value,
+};
 
 pub mod pairing;
 pub mod pairing_delete;
