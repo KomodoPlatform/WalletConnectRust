@@ -338,8 +338,6 @@ impl PairingClient {
             .map_err(|e| anyhow::anyhow!(e))
             .map_err(|err| PairingClientError::EncodeError(err.to_string()))?;
 
-        println!("\nOutbound encrypted payload={message}");
-
         // Publish the encrypted message
         {
             self.client

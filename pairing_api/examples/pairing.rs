@@ -115,7 +115,6 @@ async fn main() -> anyhow::Result<()> {
 
     let (methods, metadata) = prepare_pairing_client_data();
     let (topic, uri) = pairing_client.try_create(metadata, methods).await.unwrap();
-    println!("{uri:?}");
 
     let key = pairing_client.sym_key(&topic).await.unwrap();
     let receiver_handle = spawn(spawn_published_message_recv_loop(
@@ -146,34 +145,36 @@ async fn spawn_published_message_recv_loop(
         let topic = msg.topic.to_string();
         let key = hex::decode(key.clone()).unwrap();
         let message = decode_and_decrypt_type0(msg.message.as_bytes(), &key).unwrap();
+        println!("\nInbound message payload={message}");
+
         let response = serde_json::from_str::<Payload>(&message).unwrap();
         match response {
-            Payload::Request(value) => match value.params {
+            Payload::Request(request) => match request.params {
                 Params::PairingDelete(_) => {
                     // send a success response back to wc.
-                    let request = PairingResponseParamsSuccess::PairingDelete(true);
+                    let delete_request = PairingResponseParamsSuccess::PairingDelete(true);
                     pairing_client
-                        .publish_response(&topic, request, msg.message_id)
+                        .publish_response(&topic, delete_request, request.id)
                         .await
                         .unwrap();
                     // send a request to delete pairing from store.
                     pairing_client.delete_pairing(&topic).await.unwrap();
                 }
-                Params::PairingExtend(req) => {
-                    let request = PairingResponseParamsSuccess::PairingExtend(true);
+                Params::PairingExtend(data) => {
+                    let extend_request = PairingResponseParamsSuccess::PairingExtend(true);
                     // send a success response back to wc.
                     pairing_client
-                        .publish_response(&topic, request, msg.message_id)
+                        .publish_response(&topic, extend_request, request.id)
                         .await
                         .unwrap();
                     // send a request to update pairing expiry in store.
-                    pairing_client.update_expiry(&topic, req.expiry).await;
+                    pairing_client.update_expiry(&topic, data.expiry).await;
                 }
                 Params::PairingPing(_) => {
-                    let request = PairingResponseParamsSuccess::PairingPing(true);
+                    let ping_request = PairingResponseParamsSuccess::PairingPing(true);
                     // send a success response back to wc.
                     pairing_client
-                        .publish_response(&topic, request, msg.message_id)
+                        .publish_response(&topic, ping_request, request.id)
                         .await
                         .unwrap();
                 }
