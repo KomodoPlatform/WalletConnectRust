@@ -96,8 +96,12 @@ async fn main() -> anyhow::Result<()> {
 
     let pairing_client = PairingClient::new(client1);
 
-    // let topic = pairing_client.pair("wc:b99c41b1219a6c3131f2960e64cc015900b6880b49470e43bf14e9e520bd922d@2?expiryTimestamp=1725467415&relay-protocol=irn&symKey=4a7cccd69a33ac0a3debfbee49e8ff0e65edbdc2031ba600e37880f73eb5b638").await.unwrap();
-    // println!("CONNECTION URL: {uri}");
+    // let topic =
+    // pairing_client.pair("wc:
+    // b99c41b1219a6c3131f2960e64cc015900b6880b49470e43bf14e9e520bd922d@2?
+    // expiryTimestamp=1725467415&relay-protocol=irn&
+    // symKey=4a7cccd69a33ac0a3debfbee49e8ff0e65edbdc2031ba600e37880f73eb5b638").
+    // await.unwrap(); println!("CONNECTION URL: {uri}");
     let metadata = Metadata {
         description: "A decentralized application that enables secure communication and \
                       transactions."
