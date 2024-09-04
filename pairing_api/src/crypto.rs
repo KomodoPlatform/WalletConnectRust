@@ -124,6 +124,11 @@ pub fn encrypt_and_encode<T>(
 where
     T: AsRef<[u8]>,
 {
+    // validate sym_key len.
+    if key.len() != 32 {
+        return Err(PayloadError::SymKeyLen(key.len()));
+    }
+
     let payload = Payload {
         msg: msg.as_ref(),
         aad: &[],
@@ -146,6 +151,11 @@ pub fn decode_and_decrypt_type0<T>(msg: T, key: &[u8]) -> Result<String, Payload
 where
     T: AsRef<[u8]>,
 {
+    // validate sym_key len.
+    if key.len() != 32 {
+        return Err(PayloadError::SymKeyLen(key.len()));
+    }
+
     let data = BASE64_STANDARD.decode(msg)?;
     let decoded = EncodingParams::parse_decoded(&data)?;
     if let EnvelopeType::Type1 { .. } = decoded.envelope_type {
@@ -162,6 +172,11 @@ where
 }
 
 fn encrypt(nonce: &Nonce, payload: Payload<'_, '_>, key: &[u8]) -> Result<Vec<u8>, PayloadError> {
+    // validate sym_key len.
+    if key.len() != 32 {
+        return Err(PayloadError::SymKeyLen(key.len()));
+    }
+
     let cipher = ChaCha20Poly1305::new(key.into());
     let sealed = cipher
         .encrypt(nonce, payload)
@@ -181,6 +196,11 @@ fn encode(envelope_type: EnvelopeType, sealed: &[u8], init_vec: &InitVec) -> Str
 }
 
 fn decrypt(nonce: &Nonce, payload: Payload<'_, '_>, key: &[u8]) -> Result<Vec<u8>, PayloadError> {
+    // validate sym_key len.
+    if key.len() != 32 {
+        return Err(PayloadError::SymKeyLen(key.len()));
+    }
+
     let cipher = ChaCha20Poly1305::new(key.into());
     let unsealed = cipher
         .decrypt(nonce, payload)

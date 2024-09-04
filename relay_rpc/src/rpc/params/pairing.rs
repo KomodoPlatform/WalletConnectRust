@@ -88,6 +88,7 @@ impl_relay_protocol_helpers!(PairingResponseParamsSuccess);
 ///
 /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/rpc-methods
 /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/data-structures
+#[derive(Serialize, Deserialize)]
 pub enum PairingRequestParams {
     PairingExtend(PairingExtendRequest),
     PairingDelete(PairingDeleteRequest),

@@ -3,10 +3,10 @@ use {
     rand::{rngs::OsRng, RngCore},
     relay_client::{websocket::Client, MessageIdGenerator},
     relay_rpc::{
-        domain::Topic,
+        domain::{MessageId, Topic},
         rpc::{
             params::{
-                pairing::PairingRequestParams,
+                pairing::{PairingRequestParams, PairingResponseParamsSuccess},
                 pairing_delete::PairingDeleteRequest,
                 pairing_extend::PairingExtendRequest,
                 pairing_ping::PairingPingRequest,
@@ -18,7 +18,10 @@ use {
             Payload,
             PublishError,
             Request,
+            Response,
             SubscriptionError,
+            SuccessfulResponse,
+            JSON_RPC_VERSION_STR,
         },
     },
     serde::{Deserialize, Serialize},
@@ -169,11 +172,6 @@ impl PairingClient {
     /// Activates the pairing associated with the given topic,
     /// extends its expiry time, and sends a pairing extend request to the peer.
     pub async fn activate(&self, topic: &str) -> Result<(), PairingClientError> {
-        let mut pairings = self.pairings.lock().await;
-        let pairing = pairings
-            .get_mut(topic)
-            .ok_or_else(|| PairingClientError::PairingNotFound)?;
-
         let now = SystemTime::now();
         let expiry = now + EXPIRY_30_DAYS;
         let expiry = expiry
@@ -181,14 +179,8 @@ impl PairingClient {
             .expect("Time went backwards")
             .as_secs();
 
-        // try to extend session before updating local store.
-        let sym_key = hex::decode(pairing.sym_key.clone()).map_err(|err| {
-            PairingClientError::EncodeError(format!("Failed to decode sym_key: {:?}", err))
-        })?;
         let ping_request = PairingRequestParams::PairingExtend(PairingExtendRequest { expiry });
-        let irn_metadata = ping_request.irn_metadata();
-        self.publish_request(topic, ping_request, irn_metadata, &sym_key)
-            .await?;
+        self.publish_request(topic, ping_request).await?;
 
         // Re-acquire the lock to update the pairing
         let mut pairings = self.pairings.lock().await;
@@ -202,6 +194,7 @@ impl PairingClient {
         }
     }
 
+    /// Update pairing expiry
     pub async fn update_expiry(&self, topic: &str, expiry: u64) {
         let mut pairings = self.pairings.lock().await;
         if let Some(pairing) = pairings.get_mut(topic) {
@@ -209,6 +202,7 @@ impl PairingClient {
         }
     }
 
+    /// Update pairing metadata
     pub async fn update_metadata(&self, topic: &str, metadata: Metadata) {
         let mut pairings = self.pairings.lock().await;
         if let Some(pairing) = pairings.get_mut(topic) {
@@ -216,6 +210,10 @@ impl PairingClient {
         }
     }
 
+    /// Deletes a pairing from the store and subscribe from topic.
+    /// This should be done only after completing all necessary actions,
+    /// such as handling responses and requests, since the pairing's sym_key
+    ///  is required for encoding outgoing messages and decoding incoming ones.
     pub async fn delete_pairing(&self, topic: &str) -> Result<(), PairingClientError> {
         println!("Attempting to unsubscribe from topic: {topic}");
         {
@@ -225,10 +223,10 @@ impl PairingClient {
                 .map_err(PairingClientError::SubscriptionError)?;
         };
 
+        {};
         let mut pairings = self.pairings.lock().await;
         pairings.remove(topic);
 
-        println!("Unsubscribed from topic: {topic}");
         Ok(())
     }
 
@@ -236,24 +234,10 @@ impl PairingClient {
     /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/rpc-methods#wc_pairingping
     pub async fn ping_request(&self, topic: &str) -> Result<(), PairingClientError> {
         println!("Attempting to ping topic: {}", topic);
-        let pairing = {
-            let pairings = self.pairings.lock().await;
-            pairings.get(topic).cloned()
-        };
+        let ping_request = PairingRequestParams::PairingPing(PairingPingRequest {});
+        self.publish_request(topic, ping_request).await?;
 
-        if let Some(pairing) = pairing {
-            let sym_key = hex::decode(pairing.sym_key.clone()).map_err(|err| {
-                PairingClientError::EncodeError(format!("Failed to decode sym_key: {:?}", err))
-            })?;
-            let ping_request = PairingRequestParams::PairingPing(PairingPingRequest {});
-            let irn_metadata = ping_request.irn_metadata();
-            self.publish_request(topic, ping_request, irn_metadata, &sym_key)
-                .await?;
-
-            return Ok(());
-        }
-
-        Err(PairingClientError::PairingNotFound)
+        Ok(())
     }
 
     /// Used to inform the peer to close and delete a pairing.
@@ -263,60 +247,30 @@ impl PairingClient {
     /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/rpc-methods#wc_pairingdelete
     pub async fn delete_request(&self, topic: &str) -> Result<(), PairingClientError> {
         println!("Attempting to delete topic: {}", topic);
-        let pairing = {
-            let pairings = self.pairings.lock().await;
-            pairings.get(topic).cloned()
-        };
+        let delete_request = PairingRequestParams::PairingDelete(PairingDeleteRequest {
+            code: 6000,
+            message: "User requested disconnect".to_owned(),
+        });
+        self.publish_request(topic, delete_request).await?;
 
-        if let Some(pairing) = pairing {
-            let sym_key = hex::decode(pairing.sym_key.clone()).map_err(|err| {
-                PairingClientError::EncodeError(format!("Failed to decode sym_key: {:?}", err))
-            })?;
-            let delete_request = PairingRequestParams::PairingDelete(PairingDeleteRequest {
-                code: 6000,
-                message: "User requested disconnect".to_owned(),
-            });
-            let irn_metadata = delete_request.irn_metadata();
-            self.publish_request(topic, delete_request, irn_metadata, &sym_key)
-                .await?;
-
-            return Ok(());
-        }
-
-        Err(PairingClientError::PairingNotFound)
+        Ok(())
     }
 
     /// Used to update the lifetime of a pairing.
     /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/rpc-methods#wc_pairingextend
     pub async fn extend_request(&self, topic: &str, expiry: u64) -> Result<(), PairingClientError> {
         println!("Attempting to extend topic: {}", topic);
-        let pairing = {
-            let pairings = self.pairings.lock().await;
-            pairings.get(topic).cloned()
-        };
 
-        if let Some(pairing) = pairing {
-            let sym_key = hex::decode(pairing.sym_key.clone()).map_err(|err| {
-                PairingClientError::EncodeError(format!("Failed to decode sym_key: {:?}", err))
-            })?;
+        let now = SystemTime::now();
+        let expiry = now + Duration::from_secs(expiry);
+        let expiry = expiry
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+        let extend_request = PairingRequestParams::PairingExtend(PairingExtendRequest { expiry });
+        self.publish_request(topic, extend_request).await?;
 
-            let now = SystemTime::now();
-            let expiry = now + Duration::from_secs(expiry);
-            let expiry = expiry
-                .duration_since(UNIX_EPOCH)
-                .expect("Time went backwards")
-                .as_secs();
-            let extend_request =
-                PairingRequestParams::PairingExtend(PairingExtendRequest { expiry });
-            let irn_metadata = extend_request.irn_metadata();
-
-            self.publish_request(topic, extend_request, irn_metadata, &sym_key)
-                .await?;
-
-            return Ok(());
-        }
-
-        Err(PairingClientError::PairingNotFound)
+        Ok(())
     }
 
     /// Function to publish a request
@@ -324,14 +278,63 @@ impl PairingClient {
         &self,
         topic: &str,
         params: PairingRequestParams,
-        irn_metadata: IrnMetadata,
-        key: &[u8],
     ) -> Result<(), PairingClientError> {
+        let irn_metadata = params.irn_metadata();
         let message_id = MessageIdGenerator::new().next();
         let request = Request::new(message_id, params.into());
-        let payload = serde_json::to_string(&Payload::Request(request))
+        // Publish the encrypted message
+        self.publish_payload(topic, irn_metadata, Payload::Request(request))
+            .await?;
+
+        println!("Otbound request sent!\n");
+
+        Ok(())
+    }
+
+    /// Function to publish a request response
+    pub async fn publish_response(
+        &self,
+        topic: &str,
+        params: PairingResponseParamsSuccess,
+        message_id: MessageId,
+    ) -> Result<(), PairingClientError> {
+        let irn_metadata = params.irn_metadata();
+        let response = Response::Success(SuccessfulResponse {
+            id: message_id,
+            jsonrpc: JSON_RPC_VERSION_STR.into(),
+            result: serde_json::to_value(params)
+                .map_err(|err| PairingClientError::EncodeError(err.to_string()))?,
+        });
+
+        // Publish the encrypted message
+        self.publish_payload(topic, irn_metadata, Payload::Response(response))
+            .await?;
+
+        println!("\nOutbound request sent!");
+
+        Ok(())
+    }
+
+    async fn publish_payload(
+        &self,
+        topic: &str,
+        irn_metadata: IrnMetadata,
+        payload: Payload,
+    ) -> Result<(), PairingClientError> {
+        // try to extend session before updating local store.
+        let sym_key = {
+            let pairings = self.pairings.lock().await;
+            let pairing = pairings
+                .get(topic)
+                .ok_or_else(|| PairingClientError::PairingNotFound)?;
+            hex::decode(pairing.sym_key.clone()).map_err(|err| {
+                PairingClientError::EncodeError(format!("Failed to decode sym_key: {:?}", err))
+            })?
+        };
+
+        let payload = serde_json::to_string(&payload)
             .map_err(|err| PairingClientError::EncodeError(err.to_string()))?;
-        let message = encrypt_and_encode(crypto::EnvelopeType::Type0, payload, key)
+        let message = encrypt_and_encode(crypto::EnvelopeType::Type0, payload, &sym_key)
             .map_err(|e| anyhow::anyhow!(e))
             .map_err(|err| PairingClientError::EncodeError(err.to_string()))?;
 
@@ -351,8 +354,6 @@ impl PairingClient {
                 .await
                 .map_err(PairingClientError::PingError)?;
         };
-
-        println!("\nOutbound request sent!");
 
         Ok(())
     }
