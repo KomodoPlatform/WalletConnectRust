@@ -31,9 +31,12 @@ use {
         time::{Duration, SystemTime, UNIX_EPOCH},
     },
     tokio::sync::Mutex,
+    uri_parser::{parse_wc_uri, ParseError},
 };
 
 pub mod crypto;
+mod uri_parser;
+pub use uri_parser::Methods;
 
 /// Duration for short-term expiry (5 minutes).
 const EXPIRY_5_MINS: Duration = Duration::from_secs(250); // 5 mins
@@ -52,11 +55,15 @@ pub enum PairingClientError {
     #[error("Topic not found")]
     PairingNotFound,
     #[error("Pairing with topic already exists")]
-    PairingTopicAlreadyExits,
+    PairingTopicAlreadyExists,
     #[error("PublishError error")]
     PingError(relay_client::error::Error<PublishError>),
     #[error("Encode error")]
     EncodeError(String),
+    #[error("Unexpected parameter")]
+    ParseError(ParseError),
+    #[error("Time error")]
+    TimeError(String),
 }
 
 /// Detailed information about a pairing.
@@ -65,10 +72,10 @@ pub enum PairingClientError {
 pub struct PairingInfo {
     pub topic: String,
     pub relay: Relay,
-    pub peer_metadata: Metadata,
+    pub peer_metadata: Option<Metadata>,
     pub expiry: u64,
     pub active: bool,
-    pub methods: Vec<Vec<String>>,
+    pub methods: Methods,
 }
 
 /// Represents a complete pairing including symmetric key and version.
@@ -101,8 +108,8 @@ impl PairingClient {
     pub async fn try_create(
         &self,
         metadata: Metadata,
-        methods: Vec<Vec<String>>,
-    ) -> Result<(String, String), PairingClientError> {
+        methods: Option<Methods>,
+    ) -> Result<(Topic, String), PairingClientError> {
         let now = SystemTime::now();
         let expiry = now + EXPIRY_5_MINS;
         let expiry = expiry
@@ -118,11 +125,11 @@ impl PairingClient {
         let sym_key = gen_sym_key();
         let pairing_info = PairingInfo {
             active: false,
-            methods,
+            methods: methods.unwrap_or(Methods(vec![])),
             expiry,
             relay,
             topic: topic.clone().to_string(),
-            peer_metadata: metadata,
+            peer_metadata: Some(metadata),
         };
 
         let uri = Self::generate_uri(&pairing_info, &sym_key);
@@ -146,11 +153,58 @@ impl PairingClient {
 
         println!("\nSubscribed to topic: {topic}");
 
-        Ok((topic.to_string(), uri))
+        Ok((topic, uri))
     }
 
-    pub fn pair(&self, _uri: &str) -> Result<(), PairingClientError> {
-        todo!()
+    pub async fn pair(&self, url: &str) -> Result<Topic, PairingClientError> {
+        println!("Attempting to pair with URI: {}", url);
+        let parsed = parse_wc_uri(url).map_err(PairingClientError::ParseError)?;
+
+        let now = SystemTime::now();
+        let expiry = now + Duration::from_secs(parsed.expiry_timestamp);
+        let expiry = expiry
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| PairingClientError::TimeError(e.to_string()))?
+            .as_secs();
+
+        let relay = Relay {
+            protocol: parsed.relay_protocol,
+            data: parsed.relay_data,
+        };
+
+        let pairing_info = PairingInfo {
+            active: false,
+            methods: parsed.methods,
+            expiry,
+            relay,
+            topic: parsed.topic.clone(),
+            peer_metadata: None, // We don't have peer metadata at this point
+        };
+
+        let pairing = Pairing {
+            sym_key: parsed.sym_key,
+            version: parsed.version,
+            pairing: pairing_info,
+        };
+
+        let mut pairings = self.pairings.lock().await;
+        if pairings.contains_key(&parsed.topic) {
+            println!("Pairing with topic {} already exists", parsed.topic);
+            return Err(PairingClientError::PairingTopicAlreadyExists);
+        }
+
+        pairings.insert(parsed.topic.clone(), pairing);
+
+        println!("\nSubscribing to topic: {}", parsed.topic);
+
+        self.client
+            .subscribe(parsed.topic.clone().into())
+            .await
+            .map_err(PairingClientError::SubscriptionError)?;
+
+        println!("\nSubscribed to topic: {:?}", parsed.topic);
+
+        Ok(parsed.topic.into())
     }
 
     /// Retrieves the symmetric key for a given pairing topic.
@@ -206,7 +260,7 @@ impl PairingClient {
     pub async fn update_metadata(&self, topic: &str, metadata: Metadata) {
         let mut pairings = self.pairings.lock().await;
         if let Some(pairing) = pairings.get_mut(topic) {
-            pairing.pairing.peer_metadata = metadata;
+            pairing.pairing.peer_metadata = Some(metadata);
         }
     }
 
@@ -232,7 +286,7 @@ impl PairingClient {
 
     /// Used to evaluate if peer is currently online. Timeout at 30 seconds
     /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/rpc-methods#wc_pairingping
-    pub async fn ping_request(&self, topic: &str) -> Result<(), PairingClientError> {
+    pub async fn ping(&self, topic: &str) -> Result<(), PairingClientError> {
         println!("Attempting to ping topic: {}", topic);
         let ping_request = PairingRequestParams::PairingPing(PairingPingRequest {});
         self.publish_request(topic, ping_request).await?;
@@ -245,20 +299,30 @@ impl PairingClient {
     /// pairing must also be deleted.
     ///
     /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/rpc-methods#wc_pairingdelete
-    pub async fn delete_request(&self, topic: &str) -> Result<(), PairingClientError> {
+    pub async fn disconnect(&self, topic: &str) -> Result<(), PairingClientError> {
         println!("Attempting to delete topic: {}", topic);
-        let delete_request = PairingRequestParams::PairingDelete(PairingDeleteRequest {
-            code: 6000,
-            message: "User requested disconnect".to_owned(),
-        });
-        self.publish_request(topic, delete_request).await?;
+        {
+            let mut pairings = self.pairings.lock().await;
+            if pairings.remove(topic).is_some() {
+                self.publish_request(
+                    topic,
+                    PairingRequestParams::PairingDelete(PairingDeleteRequest {
+                        code: 6000,
+                        message: "User requested disconnect".to_owned(),
+                    }),
+                )
+                .await?;
+            };
+        }
+
+        self.delete_pairing(topic).await?;
 
         Ok(())
     }
 
     /// Used to update the lifetime of a pairing.
     /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/rpc-methods#wc_pairingextend
-    pub async fn extend_request(&self, topic: &str, expiry: u64) -> Result<(), PairingClientError> {
+    pub async fn extend(&self, topic: &str, expiry: u64) -> Result<(), PairingClientError> {
         println!("Attempting to extend topic: {}", topic);
 
         let now = SystemTime::now();
@@ -360,6 +424,7 @@ impl PairingClient {
     fn generate_uri(pairing: &PairingInfo, sym_key: &str) -> String {
         let methods_str = pairing
             .methods
+            .0
             .iter()
             .map(|method_group| format!("[{}]", method_group.join(",")))
             .collect::<Vec<_>>()
