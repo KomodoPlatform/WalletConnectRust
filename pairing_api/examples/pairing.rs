@@ -1,5 +1,6 @@
 use {
-    pairing_api::{crypto::decode_and_decrypt_type0, PairingClient},
+    common::decode_and_decrypt_type0,
+    pairing_api::PairingClient,
     relay_client::{
         error::ClientError,
         websocket::{Client, CloseFrame, ConnectionHandler, PublishedMessage},

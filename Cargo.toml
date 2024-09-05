@@ -7,7 +7,13 @@ authors = ["WalletConnect Team"]
 license = "Apache-2.0"
 
 [workspace]
-members = ["blockchain_api", "pairing_api", "relay_client", "relay_rpc"]
+members = [
+    "blockchain_api",
+    "common",
+    "pairing_api",
+    "relay_client",
+    "relay_rpc",
+]
 
 [features]
 default = ["full"]
