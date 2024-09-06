@@ -1,8 +1,12 @@
 use {
+    crate::EXPIRY_5_MINS,
     lazy_static::lazy_static,
     regex::Regex,
     serde::{Deserialize, Serialize},
-    std::collections::HashMap,
+    std::{
+        collections::HashMap,
+        time::{SystemTime, UNIX_EPOCH},
+    },
     thiserror::Error,
     url::Url,
 };
@@ -85,11 +89,22 @@ pub fn parse_wc_uri(uri: &str) -> Result<ParsedWcUri, ParseError> {
         .remove("relay-protocol")
         .ok_or(ParseError::MissingRelayProtocol)?;
     let relay_data = params.remove("relay-data");
-    let expiry_timestamp = params
-        .remove("expiryTimestamp")
-        .ok_or(ParseError::InvalidExpiryTimestamp)?
-        .parse::<u64>()
-        .map_err(|_| ParseError::InvalidExpiryTimestamp)?;
+
+    let expiry_timestamp = match params.remove("expiryTimestamp").map(|t| {
+        t.parse::<u64>()
+            .map_err(|_| ParseError::InvalidExpiryTimestamp)
+    }) {
+        None => {
+            let now = SystemTime::now();
+            let expiry = now + EXPIRY_5_MINS;
+            expiry
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs()
+        }
+
+        Some(time) => time?,
+    };
 
     // Check for unexpected parameters
     if !params.is_empty() {
@@ -109,7 +124,7 @@ pub fn parse_wc_uri(uri: &str) -> Result<ParsedWcUri, ParseError> {
     })
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Methods(pub Vec<Vec<String>>);
 
 fn parse_methods(methods_str: Option<&str>) -> Result<Methods, ParseError> {

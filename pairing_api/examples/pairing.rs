@@ -97,6 +97,8 @@ async fn main() -> anyhow::Result<()> {
     // let topic = create_pairing(&pairing_client).await;
     // Pair
     let topic = pair_from_uri(&pairing_client).await;
+    let pairing = pairing_client.get_pairing(topic.as_ref()).await.unwrap();
+    println!("{:?}", pairing);
     let key = pairing_client.sym_key(topic.as_ref()).await.unwrap();
     let receiver_handle = spawn(spawn_published_message_recv_loop(
         pairing_client,
@@ -139,7 +141,7 @@ async fn spawn_published_message_recv_loop(
                         .await
                         .unwrap();
                     // send a request to delete pairing from store.
-                    pairing_client.delete_pairing(&topic).await.unwrap();
+                    pairing_client.delete(&topic).await.unwrap();
                 }
                 Params::PairingExtend(data) => {
                     let extend_request = PairingResponseParamsSuccess::PairingExtend(true);
@@ -175,6 +177,7 @@ async fn pair_from_uri(pairing_client: &PairingClient) -> Topic {
     b99c41b1219a6c3131f2960e64cc015900b6880b49470e43bf14e9e520bd922d@2?
     expiryTimestamp=1725467415&relay-protocol=irn&
     symKey=4a7cccd69a33ac0a3debfbee49e8ff0e65edbdc2031ba600e37880f73eb5b638",
+            true,
         )
         .await
         .unwrap()
@@ -198,3 +201,4 @@ async fn pair_from_uri(pairing_client: &PairingClient) -> Topic {
 
 //     topic
 // }
+//
