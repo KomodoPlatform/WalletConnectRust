@@ -1,9 +1,16 @@
 use {
+    lazy_static::lazy_static,
+    regex::Regex,
     serde::{Deserialize, Serialize},
     std::collections::HashMap,
     thiserror::Error,
     url::Url,
 };
+
+lazy_static! {
+    static ref TOPIC_VERSION_REGEX: Regex =
+        Regex::new(r"^(?P<topic>[[:word:]-]+)@(?P<version>\d+)$").expect("Failed to compile regex");
+}
 
 #[derive(Debug, Error)]
 pub enum ParseError {
@@ -47,13 +54,27 @@ pub fn parse_wc_uri(uri: &str) -> Result<ParsedWcUri, ParseError> {
         return Err(ParseError::InvalidUri);
     }
 
-    let mut parts = url.path().split('@');
-    let topic = parts.next().ok_or(ParseError::MissingTopic)?.to_string();
-    let version = parts.next().ok_or(ParseError::InvalidVersion)?.to_string();
+    let (topic, version) = {
+        let caps = TOPIC_VERSION_REGEX
+            .captures(url.path().trim())
+            .ok_or(ParseError::InvalidUri)?;
+        let topic = caps
+            .name("topic")
+            .ok_or(ParseError::MissingTopic)?
+            .as_str()
+            .to_owned();
+        let version = caps
+            .name("version")
+            .ok_or(ParseError::InvalidVersion)?
+            .as_str()
+            .to_owned();
+
+      (topic, version)
+    };
 
     let mut params = HashMap::new();
     for (key, value) in url.query_pairs() {
-        params.insert(key.to_string(), value.to_string());
+        params.insert(key.trim().to_string(), value.trim().to_string());
     }
 
     let methods_str = params.remove("methods");

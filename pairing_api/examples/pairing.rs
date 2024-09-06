@@ -7,12 +7,11 @@ use {
         ConnectionOptions,
     },
     relay_rpc::{
-        auth::{ed25519_dalek::SigningKey, AuthToken},
-        rpc::{
-            params::{pairing::PairingResponseParamsSuccess, Metadata},
+        auth::{ed25519_dalek::SigningKey, AuthToken}, domain::Topic, rpc::{
+            params::pairing::PairingResponseParamsSuccess,
             Params,
             Payload,
-        },
+        }
     },
     std::{sync::Arc, time::Duration},
     structopt::StructOpt,
@@ -96,26 +95,10 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     let pairing_client = PairingClient::new(client1);
-
-    // let topic =
-    // pairing_client.pair("wc:
-    // b99c41b1219a6c3131f2960e64cc015900b6880b49470e43bf14e9e520bd922d@2?
-    // expiryTimestamp=1725467415&relay-protocol=irn&
-    // symKey=4a7cccd69a33ac0a3debfbee49e8ff0e65edbdc2031ba600e37880f73eb5b638").
-    // await.unwrap(); println!("CONNECTION URL: {uri}");
-    let metadata = Metadata {
-        description: "A decentralized application that enables secure communication and \
-                      transactions."
-            .to_string(),
-        url: "https://127.0.0.1:3000".to_string(),
-        icons: vec![
-            "https://example-dapp.com/icon1.png".to_string(),
-            "https://example-dapp.com/icon2.png".to_string(),
-        ],
-        name: "Example DApp".to_string(),
-    };
-    let (topic, uri) = pairing_client.try_create(metadata, None).await.unwrap();
-    println!("pairing_uri: {uri}");
+    // Create Pairing.
+    // let topic = create_pairing(&pairing_client).await;
+    // Pair
+    let topic = pair_from_uri(&pairing_client).await;
     let key = pairing_client.sym_key(topic.as_ref()).await.unwrap();
     let receiver_handle = spawn(spawn_published_message_recv_loop(
         pairing_client,
@@ -186,3 +169,34 @@ async fn spawn_published_message_recv_loop(
         }
     }
 }
+
+async fn pair_from_uri(pairing_client: &PairingClient) -> Topic {
+    pairing_client
+        .pair(
+            "wc:
+    b99c41b1219a6c3131f2960e64cc015900b6880b49470e43bf14e9e520bd922d@2?
+    expiryTimestamp=1725467415&relay-protocol=irn&
+    symKey=4a7cccd69a33ac0a3debfbee49e8ff0e65edbdc2031ba600e37880f73eb5b638",
+        )
+        .await
+        .unwrap()
+}
+
+// async fn create_pairing(pairing_client: &PairingClient) -> Topic {
+//     let metadata = Metadata {
+//         description: "A decentralized application that enables secure
+//         communication and transactions."
+//             .to_string(),
+//         url: "https://127.0.0.1:3000".to_string(),
+//         icons: vec![
+//             "https://example-dapp.com/icon1.png".to_string(),
+//             "https://example-dapp.com/icon2.png".to_string(),
+//         ],
+//         name: "Example DApp".to_string(),
+//     };
+
+//     let (topic, uri) = pairing_client.try_create(metadata, None).await.unwrap();
+//     println!("pairing_uri: {uri}");
+
+//     topic
+// }
