@@ -7,6 +7,15 @@ pub mod pairing;
 pub mod pairing_delete;
 pub mod pairing_extend;
 pub mod pairing_ping;
+pub mod session;
+pub mod session_delete;
+pub mod session_event;
+pub mod session_extend;
+pub mod session_ping;
+pub mod session_propose;
+pub mod session_request;
+pub mod session_settle;
+pub mod session_update;
 
 /// Metadata associated with a pairing.
 #[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone, Default)]
