@@ -7,11 +7,9 @@ use {
         ConnectionOptions,
     },
     relay_rpc::{
-        auth::{ed25519_dalek::SigningKey, AuthToken}, domain::Topic, rpc::{
-            params::pairing::PairingResponseParamsSuccess,
-            Params,
-            Payload,
-        }
+        auth::{ed25519_dalek::SigningKey, AuthToken},
+        domain::Topic,
+        rpc::{params::pairing::PairingResponseParamsSuccess, Params, Payload},
     },
     std::{sync::Arc, time::Duration},
     structopt::StructOpt,
@@ -195,8 +193,8 @@ async fn pair_from_uri(pairing_client: &PairingClient) -> Topic {
 //         name: "Example DApp".to_string(),
 //     };
 
-//     let (topic, uri) = pairing_client.try_create(metadata, None).await.unwrap();
-//     println!("pairing_uri: {uri}");
+//     let (topic, uri) = pairing_client.try_create(metadata,
+// None).await.unwrap();     println!("pairing_uri: {uri}");
 
 //     topic
 // }

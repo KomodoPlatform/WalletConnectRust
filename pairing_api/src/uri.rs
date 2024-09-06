@@ -69,7 +69,7 @@ pub fn parse_wc_uri(uri: &str) -> Result<ParsedWcUri, ParseError> {
             .as_str()
             .to_owned();
 
-      (topic, version)
+        (topic, version)
     };
 
     let mut params = HashMap::new();
