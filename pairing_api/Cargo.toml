@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.86"
-common = { path = "../common" }
+wc_common = { path = "../wc_common" }
 hex = "0.4.2"
 lazy_static = "1.4"
 paste = "1.0.15"

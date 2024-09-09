@@ -9,7 +9,7 @@ license = "Apache-2.0"
 [workspace]
 members = [
     "blockchain_api",
-    "common",
+    "wc_common",
     "pairing_api",
     "relay_client",
     "relay_rpc",

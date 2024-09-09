@@ -3,7 +3,6 @@ use {
         uri::{parse_wc_uri, ParseError},
         Methods,
     },
-    common::{encrypt_and_encode, EnvelopeType},
     rand::{rngs::OsRng, RngCore},
     relay_client::{websocket::Client, MessageIdGenerator},
     relay_rpc::{
@@ -35,6 +34,7 @@ use {
         time::{Duration, SystemTime, UNIX_EPOCH},
     },
     tokio::sync::Mutex,
+    wc_common::{encrypt_and_encode, EnvelopeType},
 };
 
 /// Duration for short-term expiry (5 minutes).
@@ -81,9 +81,9 @@ pub struct PairingInfo {
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pairing {
-    sym_key: String,
-    version: String,
-    pairing: PairingInfo,
+    pub sym_key: String,
+    pub version: String,
+    pub pairing: PairingInfo,
 }
 
 impl Pairing {
@@ -122,17 +122,21 @@ impl Pairing {
 /// Client for managing WalletConnect pairings.
 #[derive(Debug)]
 pub struct PairingClient {
-    client: Arc<Client>,
     pub pairings: Arc<Mutex<HashMap<String, Pairing>>>,
+}
+
+impl Default for PairingClient {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PairingClient {
     /// initializes the client with persisted storage and a network connection
-    pub fn new(client: Arc<Client>) -> Arc<Self> {
-        Arc::new(Self {
-            client,
+    pub fn new() -> Self {
+        Self {
             pairings: Arc::new(HashMap::new().into()),
-        })
+        }
     }
 
     /// Attempts to generate a new pairing, stores it in the client's pairing
@@ -142,6 +146,7 @@ impl PairingClient {
         &self,
         metadata: Metadata,
         methods: Option<Methods>,
+        client: &Client,
     ) -> Result<(Topic, String), PairingClientError> {
         let now = SystemTime::now();
         let expiry = now + EXPIRY_5_MINS;
@@ -179,7 +184,7 @@ impl PairingClient {
 
         println!("\nSubscribing to topic: {topic}");
 
-        self.client
+        client
             .subscribe(topic.clone())
             .await
             .map_err(PairingClientError::SubscriptionError)?;
@@ -190,7 +195,12 @@ impl PairingClient {
     }
 
     /// for responder to pair a pairing created by a proposer
-    pub async fn pair(&self, url: &str, activate: bool) -> Result<Topic, PairingClientError> {
+    pub async fn pair(
+        &self,
+        url: &str,
+        activate: bool,
+        client: &Client,
+    ) -> Result<Topic, PairingClientError> {
         println!("Attempting to pair with URI: {}", url);
         let mut pairing = Pairing::try_from_url(url)?;
         let topic = pairing.pairing.topic.clone();
@@ -224,7 +234,7 @@ impl PairingClient {
 
         // Subscribe to the pairing topic
         println!("\nSubscribing to topic: {}", topic);
-        self.client
+        client
             .subscribe(topic.clone().into())
             .await
             .map_err(PairingClientError::SubscriptionError)?;
@@ -289,10 +299,10 @@ impl PairingClient {
     /// This should be done only after completing all necessary actions,
     /// such as handling responses and requests, since the pairing's sym_key
     ///  is required for encoding outgoing messages and decoding incoming ones.
-    pub async fn delete(&self, topic: &str) -> Result<(), PairingClientError> {
+    pub async fn delete(&self, topic: &str, client: &Client) -> Result<(), PairingClientError> {
         println!("Attempting to unsubscribe from topic: {topic}");
         {
-            self.client
+            client
                 .unsubscribe(topic.into())
                 .await
                 .map_err(PairingClientError::SubscriptionError)?;
@@ -307,16 +317,16 @@ impl PairingClient {
 
     /// Used to evaluate if peer is currently online. Timeout at 30 seconds
     /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/rpc-methods#wc_pairingping
-    pub async fn ping(&self, topic: &str) -> Result<(), PairingClientError> {
+    pub async fn ping(&self, topic: &str, client: &Client) -> Result<(), PairingClientError> {
         println!("Attempting to ping topic: {}", topic);
         let ping_request = PairingRequestParams::PairingPing(PairingPingRequest {});
-        self.publish_request(topic, ping_request).await?;
+        self.publish_request(topic, ping_request, client).await?;
 
         Ok(())
     }
 
     /// for either peer to disconnect a pairing
-    pub async fn disconnect(&self, topic: &str) -> Result<(), PairingClientError> {
+    pub async fn disconnect(&self, topic: &str, client: &Client) -> Result<(), PairingClientError> {
         println!("Attempting to delete topic: {}", topic);
         {
             let mut pairings = self.pairings.lock().await;
@@ -327,19 +337,25 @@ impl PairingClient {
                         code: 6000,
                         message: "User requested disconnect".to_owned(),
                     }),
+                    client,
                 )
                 .await?;
             };
         }
 
-        self.delete(topic).await?;
+        self.delete(topic, client).await?;
 
         Ok(())
     }
 
     /// Used to update the lifetime of a pairing.
     /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/rpc-methods#wc_pairingextend
-    pub async fn extend(&self, topic: &str, expiry: u64) -> Result<(), PairingClientError> {
+    pub async fn extend(
+        &self,
+        topic: &str,
+        expiry: u64,
+        client: &Client,
+    ) -> Result<(), PairingClientError> {
         println!("Attempting to extend topic: {}", topic);
 
         let now = SystemTime::now();
@@ -349,7 +365,7 @@ impl PairingClient {
             .expect("Time went backwards")
             .as_secs();
         let extend_request = PairingRequestParams::PairingExtend(PairingExtendRequest { expiry });
-        self.publish_request(topic, extend_request).await?;
+        self.publish_request(topic, extend_request, client).await?;
 
         Ok(())
     }
@@ -359,12 +375,13 @@ impl PairingClient {
         &self,
         topic: &str,
         params: PairingRequestParams,
+        client: &Client,
     ) -> Result<(), PairingClientError> {
         let irn_metadata = params.irn_metadata();
         let message_id = MessageIdGenerator::new().next();
         let request = Request::new(message_id, params.into());
         // Publish the encrypted message
-        self.publish_payload(topic, irn_metadata, Payload::Request(request))
+        self.publish_payload(topic, irn_metadata, Payload::Request(request), client)
             .await?;
 
         println!("Otbound request sent!\n");
@@ -378,6 +395,7 @@ impl PairingClient {
         topic: &str,
         params: PairingResponseParamsSuccess,
         message_id: MessageId,
+        client: &Client,
     ) -> Result<(), PairingClientError> {
         let irn_metadata = params.irn_metadata();
         let response = Response::Success(SuccessfulResponse {
@@ -388,7 +406,7 @@ impl PairingClient {
         });
 
         // Publish the encrypted message
-        self.publish_payload(topic, irn_metadata, Payload::Response(response))
+        self.publish_payload(topic, irn_metadata, Payload::Response(response), client)
             .await?;
 
         println!("\nOutbound request sent!");
@@ -402,6 +420,7 @@ impl PairingClient {
         topic: &str,
         irn_metadata: IrnMetadata,
         payload: Payload,
+        client: &Client,
     ) -> Result<(), PairingClientError> {
         // try to extend session before updating local store.
         let sym_key = {
@@ -422,7 +441,7 @@ impl PairingClient {
 
         // Publish the encrypted message
         {
-            self.client
+            client
                 .publish(
                     topic.into(),
                     message,

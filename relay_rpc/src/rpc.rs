@@ -4,7 +4,16 @@
 use {
     crate::domain::{DidKey, MessageId, SubscriptionId, Topic},
     params::{
-        pairing_delete::PairingDeleteRequest, pairing_extend::PairingExtendRequest, pairing_ping::PairingPingRequest, session_delete::SessionDeleteRequest, session_event::SessionEventRequest, session_extend::SessionExtendRequest, session_propose::SessionProposeRequest, session_request::SessionRequestRequest, session_settle::SessionSettleRequest, session_update::SessionUpdateRequest
+        pairing_delete::PairingDeleteRequest,
+        pairing_extend::PairingExtendRequest,
+        pairing_ping::PairingPingRequest,
+        session_delete::SessionDeleteRequest,
+        session_event::SessionEventRequest,
+        session_extend::SessionExtendRequest,
+        session_propose::SessionProposeRequest,
+        session_request::SessionRequestRequest,
+        session_settle::SessionSettleRequest,
+        session_update::SessionUpdateRequest,
     },
     serde::{de::DeserializeOwned, Deserialize, Serialize},
     std::{fmt::Debug, sync::Arc},

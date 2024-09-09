@@ -1,5 +1,4 @@
 use {
-    common::decode_and_decrypt_type0,
     pairing_api::PairingClient,
     relay_client::{
         error::ClientError,
@@ -18,6 +17,7 @@ use {
         spawn,
         sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     },
+    wc_common::decode_and_decrypt_type0,
 };
 
 #[derive(StructOpt)]
@@ -92,15 +92,16 @@ async fn main() -> anyhow::Result<()> {
         .connect(&create_conn_opts(&args.address, &args.project_id))
         .await?;
 
-    let pairing_client = PairingClient::new(client1);
+    let pairing_client = Arc::new(PairingClient::new());
     // Create Pairing.
     // let topic = create_pairing(&pairing_client).await;
     // Pair
-    let topic = pair_from_uri(&pairing_client).await;
+    let topic = pair_from_uri(&pairing_client, &client1).await;
     let pairing = pairing_client.get_pairing(topic.as_ref()).await.unwrap();
     println!("{:?}", pairing);
     let key = pairing_client.sym_key(topic.as_ref()).await.unwrap();
     let receiver_handle = spawn(spawn_published_message_recv_loop(
+        client1,
         pairing_client,
         receiver,
         key,
@@ -120,6 +121,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn spawn_published_message_recv_loop(
+    client: Arc<Client>,
     pairing_client: Arc<PairingClient>,
     mut recv: UnboundedReceiver<PublishedMessage>,
     key: String,
@@ -137,17 +139,17 @@ async fn spawn_published_message_recv_loop(
                     // send a success response back to wc.
                     let delete_request = PairingResponseParamsSuccess::PairingDelete(true);
                     pairing_client
-                        .publish_response(&topic, delete_request, request.id)
+                        .publish_response(&topic, delete_request, request.id, &client)
                         .await
                         .unwrap();
                     // send a request to delete pairing from store.
-                    pairing_client.delete(&topic).await.unwrap();
+                    pairing_client.delete(&topic, &client).await.unwrap();
                 }
                 Params::PairingExtend(data) => {
                     let extend_request = PairingResponseParamsSuccess::PairingExtend(true);
                     // send a success response back to wc.
                     pairing_client
-                        .publish_response(&topic, extend_request, request.id)
+                        .publish_response(&topic, extend_request, request.id, &client)
                         .await
                         .unwrap();
                     // send a request to update pairing expiry in store.
@@ -157,7 +159,7 @@ async fn spawn_published_message_recv_loop(
                     let ping_request = PairingResponseParamsSuccess::PairingPing(true);
                     // send a success response back to wc.
                     pairing_client
-                        .publish_response(&topic, ping_request, request.id)
+                        .publish_response(&topic, ping_request, request.id, &client)
                         .await
                         .unwrap();
                 }
@@ -170,7 +172,7 @@ async fn spawn_published_message_recv_loop(
     }
 }
 
-async fn pair_from_uri(pairing_client: &PairingClient) -> Topic {
+async fn pair_from_uri(pairing_client: &PairingClient, client: &Client) -> Topic {
     pairing_client
         .pair(
             "wc:
@@ -178,6 +180,7 @@ async fn pair_from_uri(pairing_client: &PairingClient) -> Topic {
     expiryTimestamp=1725467415&relay-protocol=irn&
     symKey=4a7cccd69a33ac0a3debfbee49e8ff0e65edbdc2031ba600e37880f73eb5b638",
             true,
+            client,
         )
         .await
         .unwrap()
