@@ -314,7 +314,7 @@ macro_rules! impl_relay_protocol_helpers {
 /// https://specs.walletconnect.com/2.0/specs/clients/sign/data-structures
 #[derive(Debug, Serialize, Eq, Deserialize, Clone, PartialEq)]
 #[serde(tag = "method", content = "params")]
-pub enum RequestParams {
+pub enum SessionRequestParams {
     #[serde(rename = "wc_sessionPropose")]
     SessionPropose(SessionProposeRequest),
     #[serde(rename = "wc_sessionSettle")]
@@ -333,7 +333,7 @@ pub enum RequestParams {
     SessionPing(()),
 }
 
-impl_relay_protocol_metadata!(RequestParams, request);
+impl_relay_protocol_metadata!(SessionRequestParams, request);
 
 /// https://www.jsonrpc.org/specification#response_object
 ///
@@ -358,7 +358,7 @@ pub enum ResponseParams {
 /// Typed success response parameters.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum ResponseParamsSuccess {
+pub enum SessionResponseParamsSuccess {
     SessionPropose(SessionProposeResponse),
     SessionSettle(bool),
     SessionUpdate(bool),
@@ -368,13 +368,13 @@ pub enum ResponseParamsSuccess {
     SessionDelete(bool),
     SessionPing(bool),
 }
-impl_relay_protocol_metadata!(ResponseParamsSuccess, response);
-impl_relay_protocol_helpers!(ResponseParamsSuccess);
+impl_relay_protocol_metadata!(SessionResponseParamsSuccess, response);
+impl_relay_protocol_helpers!(SessionResponseParamsSuccess);
 
-impl TryFrom<ResponseParamsSuccess> for ResponseParams {
+impl TryFrom<SessionResponseParamsSuccess> for ResponseParams {
     type Error = ParamsError;
 
-    fn try_from(value: ResponseParamsSuccess) -> Result<Self, Self::Error> {
+    fn try_from(value: SessionResponseParamsSuccess) -> Result<Self, Self::Error> {
         Ok(Self::Success(serde_json::to_value(value)?))
     }
 }
@@ -382,7 +382,7 @@ impl TryFrom<ResponseParamsSuccess> for ResponseParams {
 /// Typed error response parameters.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum ResponseParamsError {
+pub enum SessionResponseParamsError {
     SessionPropose(ErrorData),
     SessionSettle(ErrorData),
     SessionUpdate(ErrorData),
@@ -392,13 +392,13 @@ pub enum ResponseParamsError {
     SessionDelete(ErrorData),
     SessionPing(ErrorData),
 }
-impl_relay_protocol_metadata!(ResponseParamsError, response);
-impl_relay_protocol_helpers!(ResponseParamsError);
+impl_relay_protocol_metadata!(SessionResponseParamsError, response);
+impl_relay_protocol_helpers!(SessionResponseParamsError);
 
-impl TryFrom<ResponseParamsError> for ResponseParams {
+impl TryFrom<SessionResponseParamsError> for ResponseParams {
     type Error = ParamsError;
 
-    fn try_from(value: ResponseParamsError) -> Result<Self, Self::Error> {
+    fn try_from(value: SessionResponseParamsError) -> Result<Self, Self::Error> {
         Ok(Self::Err(serde_json::to_value(value)?))
     }
 }
@@ -416,7 +416,10 @@ pub fn param_json_trim(json: &str) -> String {
 
 /// Tests input json serialization/deserialization into the specified type.
 #[cfg(test)]
-pub(crate) fn param_serde_test<T>(json: &str) -> Result<()>
+use serde::de::DeserializeOwned;
+
+#[cfg(test)]
+pub(crate) fn param_serde_test<T>(json: &str) -> anyhow::Result<()>
 where
     T: Serialize + DeserializeOwned,
 {
@@ -431,7 +434,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {super::*, anyhow::Result, serde::de::DeserializeOwned, serde_json};
+    use {super::*, anyhow::Result};
 
     // ========================================================================================================
     // https://specs.walletconnect.com/2.0/specs/clients/sign/namespaces#

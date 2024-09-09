@@ -4,9 +4,7 @@
 use {
     crate::domain::{DidKey, MessageId, SubscriptionId, Topic},
     params::{
-        pairing_delete::PairingDeleteRequest,
-        pairing_extend::PairingExtendRequest,
-        pairing_ping::PairingPingRequest,
+        pairing_delete::PairingDeleteRequest, pairing_extend::PairingExtendRequest, pairing_ping::PairingPingRequest, session_delete::SessionDeleteRequest, session_event::SessionEventRequest, session_extend::SessionExtendRequest, session_propose::SessionProposeRequest, session_request::SessionRequestRequest, session_settle::SessionSettleRequest, session_update::SessionUpdateRequest
     },
     serde::{de::DeserializeOwned, Deserialize, Serialize},
     std::{fmt::Debug, sync::Arc},
@@ -817,12 +815,27 @@ pub enum Params {
 
     #[serde(rename = "wc_pairingExtend")]
     PairingExtend(PairingExtendRequest),
-
     #[serde(rename = "wc_pairingDelete")]
     PairingDelete(PairingDeleteRequest),
-
     #[serde(rename = "wc_pairingPing")]
     PairingPing(PairingPingRequest),
+
+    #[serde(rename = "wc_sessionPropose")]
+    SessionPropose(SessionProposeRequest),
+    #[serde(rename = "wc_sessionSettle")]
+    SessionSettle(SessionSettleRequest),
+    #[serde(rename = "wc_sessionUpdate")]
+    SessionUpdate(SessionUpdateRequest),
+    #[serde(rename = "wc_sessionExtend")]
+    SessionExtend(SessionExtendRequest),
+    #[serde(rename = "wc_sessionRequest")]
+    SessionRequest(SessionRequestRequest),
+    #[serde(rename = "wc_sessionEvent")]
+    SessionEvent(SessionEventRequest),
+    #[serde(rename = "wc_sessionDelete")]
+    SessionDelete(SessionDeleteRequest),
+    #[serde(rename = "wc_sessionPing")]
+    SessionPing(()),
 }
 
 /// Data structure representing a JSON RPC request.
