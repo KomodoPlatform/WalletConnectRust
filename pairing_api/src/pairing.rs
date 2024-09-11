@@ -9,7 +9,6 @@ use {
         domain::{MessageId, Topic},
         rpc::{
             params::{
-                pairing::{PairingRequestParams, PairingResponseParamsSuccess},
                 pairing_delete::PairingDeleteRequest,
                 pairing_extend::PairingExtendRequest,
                 pairing_ping::PairingPingRequest,
@@ -17,6 +16,8 @@ use {
                 Metadata,
                 Relay,
                 RelayProtocolMetadata,
+                RequestParams,
+                ResponseParamsSuccess,
             },
             Payload,
             PublishError,
@@ -319,7 +320,7 @@ impl PairingClient {
     /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/rpc-methods#wc_pairingping
     pub async fn ping(&self, topic: &str, client: &Client) -> Result<(), PairingClientError> {
         println!("Attempting to ping topic: {}", topic);
-        let ping_request = PairingRequestParams::PairingPing(PairingPingRequest {});
+        let ping_request = RequestParams::PairingPing(PairingPingRequest {});
         self.publish_request(topic, ping_request, client).await?;
 
         Ok(())
@@ -333,7 +334,7 @@ impl PairingClient {
             if pairings.remove(topic).is_some() {
                 self.publish_request(
                     topic,
-                    PairingRequestParams::PairingDelete(PairingDeleteRequest {
+                    RequestParams::PairingDelete(PairingDeleteRequest {
                         code: 6000,
                         message: "User requested disconnect".to_owned(),
                     }),
@@ -364,7 +365,7 @@ impl PairingClient {
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
-        let extend_request = PairingRequestParams::PairingExtend(PairingExtendRequest { expiry });
+        let extend_request = RequestParams::PairingExtend(PairingExtendRequest { expiry });
         self.publish_request(topic, extend_request, client).await?;
 
         Ok(())
@@ -374,7 +375,7 @@ impl PairingClient {
     async fn publish_request(
         &self,
         topic: &str,
-        params: PairingRequestParams,
+        params: RequestParams,
         client: &Client,
     ) -> Result<(), PairingClientError> {
         let irn_metadata = params.irn_metadata();
@@ -393,7 +394,7 @@ impl PairingClient {
     pub async fn publish_response(
         &self,
         topic: &str,
-        params: PairingResponseParamsSuccess,
+        params: ResponseParamsSuccess,
         message_id: MessageId,
         client: &Client,
     ) -> Result<(), PairingClientError> {

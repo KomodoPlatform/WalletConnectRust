@@ -8,7 +8,7 @@ use {
     relay_rpc::{
         auth::{ed25519_dalek::SigningKey, AuthToken},
         domain::Topic,
-        rpc::{params::pairing::PairingResponseParamsSuccess, Params, Payload},
+        rpc::{params::ResponseParamsSuccess, Params, Payload},
     },
     std::{sync::Arc, time::Duration},
     structopt::StructOpt,
@@ -137,7 +137,7 @@ async fn spawn_published_message_recv_loop(
             Payload::Request(request) => match request.params {
                 Params::PairingDelete(_) => {
                     // send a success response back to wc.
-                    let delete_request = PairingResponseParamsSuccess::PairingDelete(true);
+                    let delete_request = ResponseParamsSuccess::PairingDelete(true);
                     pairing_client
                         .publish_response(&topic, delete_request, request.id, &client)
                         .await
@@ -146,7 +146,7 @@ async fn spawn_published_message_recv_loop(
                     pairing_client.delete(&topic, &client).await.unwrap();
                 }
                 Params::PairingExtend(data) => {
-                    let extend_request = PairingResponseParamsSuccess::PairingExtend(true);
+                    let extend_request = ResponseParamsSuccess::PairingExtend(true);
                     // send a success response back to wc.
                     pairing_client
                         .publish_response(&topic, extend_request, request.id, &client)
@@ -156,7 +156,7 @@ async fn spawn_published_message_recv_loop(
                     pairing_client.update_expiry(&topic, data.expiry).await;
                 }
                 Params::PairingPing(_) => {
-                    let ping_request = PairingResponseParamsSuccess::PairingPing(true);
+                    let ping_request = ResponseParamsSuccess::PairingPing(true);
                     // send a success response back to wc.
                     pairing_client
                         .publish_response(&topic, ping_request, request.id, &client)
