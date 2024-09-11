@@ -1,12 +1,10 @@
 use {
     crate::EXPIRY_5_MINS,
+    chrono::Utc,
     lazy_static::lazy_static,
     regex::Regex,
     serde::{Deserialize, Serialize},
-    std::{
-        collections::HashMap,
-        time::{SystemTime, UNIX_EPOCH},
-    },
+    std::collections::HashMap,
     thiserror::Error,
     url::Url,
 };
@@ -94,14 +92,7 @@ pub fn parse_wc_uri(uri: &str) -> Result<ParsedWcUri, ParseError> {
         t.parse::<u64>()
             .map_err(|_| ParseError::InvalidExpiryTimestamp)
     }) {
-        None => {
-            let now = SystemTime::now();
-            let expiry = now + EXPIRY_5_MINS;
-            expiry
-                .duration_since(UNIX_EPOCH)
-                .expect("Time went backwards")
-                .as_secs()
-        }
+        None => Utc::now().timestamp() as u64 + EXPIRY_5_MINS,
 
         Some(time) => time?,
     };

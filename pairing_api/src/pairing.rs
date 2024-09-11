@@ -3,6 +3,7 @@ use {
         uri::{parse_wc_uri, ParseError},
         Methods,
     },
+    chrono::Utc,
     rand::{rngs::OsRng, RngCore},
     relay_client::{websocket::Client, MessageIdGenerator},
     relay_rpc::{
@@ -29,19 +30,15 @@ use {
         },
     },
     serde::{Deserialize, Serialize},
-    std::{
-        collections::HashMap,
-        sync::Arc,
-        time::{Duration, SystemTime, UNIX_EPOCH},
-    },
+    std::{collections::HashMap, sync::Arc, time::Duration},
     tokio::sync::Mutex,
     wc_common::{encrypt_and_encode, EnvelopeType},
 };
 
 /// Duration for short-term expiry (5 minutes).
-pub(crate) const EXPIRY_5_MINS: Duration = Duration::from_secs(250); // 5 mins
+pub(crate) const EXPIRY_5_MINS: u64 = 300; // 5 mins
 /// Duration for long-term expiry (30 days).
-const EXPIRY_30_DAYS: Duration = Duration::from_secs(30 * 60); // 5 mins
+pub(crate) const EXPIRY_30_DAYS: u64 = 30 * 60 * 60; // 30 days
 /// The relay protocol used for WalletConnect communications.
 const RELAY_PROTOCOL: &str = "irn";
 /// The version of the WalletConnect protocol.
@@ -91,13 +88,7 @@ impl Pairing {
     pub fn try_from_url(url: &str) -> Result<Self, PairingClientError> {
         let parsed = parse_wc_uri(url).map_err(PairingClientError::ParseError)?;
 
-        let now = SystemTime::now();
-        let expiry = now + Duration::from_secs(parsed.expiry_timestamp);
-        let expiry = expiry
-            .duration_since(UNIX_EPOCH)
-            .map_err(|e| PairingClientError::TimeError(e.to_string()))?
-            .as_secs();
-
+        let expiry = parsed.expiry_timestamp;
         let relay = Relay {
             protocol: parsed.relay_protocol,
             data: parsed.relay_data,
@@ -149,12 +140,7 @@ impl PairingClient {
         methods: Option<Methods>,
         client: &Client,
     ) -> Result<(Topic, String), PairingClientError> {
-        let now = SystemTime::now();
-        let expiry = now + EXPIRY_5_MINS;
-        let expiry = expiry
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let expiry = Utc::now().timestamp() as u64 + EXPIRY_5_MINS;
 
         let topic = Topic::generate();
         let relay = Relay {
@@ -262,12 +248,7 @@ impl PairingClient {
 
     /// for either to activate a previously created pairing
     pub async fn activate(&self, topic: &str) -> Result<(), PairingClientError> {
-        let now = SystemTime::now();
-        let expiry = now + EXPIRY_30_DAYS;
-        let expiry = expiry
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let expiry = Utc::now().timestamp() as u64 + EXPIRY_30_DAYS;
 
         let mut pairings = self.pairings.lock().await;
         if let Some(pairing) = pairings.get_mut(topic) {
@@ -319,7 +300,6 @@ impl PairingClient {
     /// Used to evaluate if peer is currently online. Timeout at 30 seconds
     /// https://specs.walletconnect.com/2.0/specs/clients/core/pairing/rpc-methods#wc_pairingping
     pub async fn ping(&self, topic: &str, client: &Client) -> Result<(), PairingClientError> {
-        println!("Attempting to ping topic: {}", topic);
         let ping_request = RequestParams::PairingPing(PairingPingRequest {});
         self.publish_request(topic, ping_request, client).await?;
 
@@ -328,7 +308,6 @@ impl PairingClient {
 
     /// for either peer to disconnect a pairing
     pub async fn disconnect(&self, topic: &str, client: &Client) -> Result<(), PairingClientError> {
-        println!("Attempting to delete topic: {}", topic);
         {
             let mut pairings = self.pairings.lock().await;
             if pairings.remove(topic).is_some() {
@@ -357,14 +336,6 @@ impl PairingClient {
         expiry: u64,
         client: &Client,
     ) -> Result<(), PairingClientError> {
-        println!("Attempting to extend topic: {}", topic);
-
-        let now = SystemTime::now();
-        let expiry = now + Duration::from_secs(expiry);
-        let expiry = expiry
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
         let extend_request = RequestParams::PairingExtend(PairingExtendRequest { expiry });
         self.publish_request(topic, extend_request, client).await?;
 
