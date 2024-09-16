@@ -138,7 +138,6 @@ impl PairingClient {
         &self,
         metadata: Metadata,
         methods: Option<Methods>,
-        client: &Client,
     ) -> Result<(Topic, String), PairingClientError> {
         let expiry = Utc::now().timestamp() as u64 + EXPIRY_5_MINS;
 
@@ -169,25 +168,11 @@ impl PairingClient {
             pairings.insert(topic.clone().to_string(), pairing);
         }
 
-        println!("\nSubscribing to topic: {topic}");
-
-        client
-            .subscribe(topic.clone())
-            .await
-            .map_err(PairingClientError::SubscriptionError)?;
-
-        println!("\nSubscribed to topic: {topic}");
-
         Ok((topic, uri))
     }
 
     /// for responder to pair a pairing created by a proposer
-    pub async fn pair(
-        &self,
-        url: &str,
-        activate: bool,
-        client: &Client,
-    ) -> Result<Topic, PairingClientError> {
+    pub async fn pair(&self, url: &str, activate: bool) -> Result<Topic, PairingClientError> {
         println!("Attempting to pair with URI: {}", url);
         let mut pairing = Pairing::try_from_url(url)?;
         let topic = pairing.pairing.topic.clone();
@@ -218,14 +203,6 @@ impl PairingClient {
             let mut pairings = self.pairings.lock().await;
             pairings.insert(topic.clone(), pairing);
         }
-
-        // Subscribe to the pairing topic
-        println!("\nSubscribing to topic: {}", topic);
-        client
-            .subscribe(topic.clone().into())
-            .await
-            .map_err(PairingClientError::SubscriptionError)?;
-        println!("\nSuccessfully subscribed to topic: {:?}", topic);
 
         Ok(topic.into())
     }

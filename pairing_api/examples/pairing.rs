@@ -97,8 +97,15 @@ async fn main() -> anyhow::Result<()> {
     // let topic = create_pairing(&pairing_client).await;
     // Pair
     let topic = pair_from_uri(&pairing_client, &client1).await;
+    // Subscribe to the pairing topic
+    println!("\nSubscribing to topic: {}", topic);
+    client1
+        .subscribe(topic.clone().into())
+        .await
+        .map_err(PairingClientError::SubscriptionError)?;
+    println!("\nSuccessfully subscribed to topic: {:?}", topic);
+
     let pairing = pairing_client.get_pairing(topic.as_ref()).await.unwrap();
-    println!("{:?}", pairing);
     let key = pairing_client.sym_key(topic.as_ref()).await.unwrap();
     let receiver_handle = spawn(spawn_published_message_recv_loop(
         client1,
