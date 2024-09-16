@@ -21,18 +21,18 @@ pub(super) const IRN_RESPONSE_METADATA: IrnMetadata = IrnMetadata {
 #[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Event {
-    name: String,
+    pub name: String,
     /// Opaque blockchain RPC data.
     ///
     /// Parsing is deferred to a higher level, blockchain RPC aware code.
-    data: serde_json::Value,
+    pub data: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionEventRequest {
-    event: Event,
-    chain_id: String,
+    pub event: Event,
+    pub chain_id: String,
 }
 
 #[cfg(test)]

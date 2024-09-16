@@ -210,16 +210,17 @@ impl ProposeNamespaces {
 /// TODO: named errors like in `ProposeNamespaces`.
 #[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct SettleNamespaces(pub BTreeMap<String, SettleNamespace>);
+pub struct SettleNamespaces(pub BTreeMap<String, Namespace>);
 
 impl Deref for SettleNamespaces {
-    type Target = BTreeMap<String, SettleNamespace>;
+    type Target = BTreeMap<String, Namespace>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
+#[allow(unused)]
 #[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SettleNamespace {
@@ -228,8 +229,16 @@ pub struct SettleNamespace {
     pub events: BTreeSet<String>,
 }
 
-/// Trims json of the whitespaces and newlines.
-///
+#[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct Namespace {
+    pub chains: Option<BTreeSet<String>>,
+    pub accounts: Option<BTreeSet<String>>,
+    pub methods: BTreeSet<String>,
+    pub events: BTreeSet<String>,
+}
+
+// Trims json of the whitespaces and newlines.
 /// Allows to use "pretty json" in unittest, and still get consistent
 /// results post serialization/deserialization.
 #[cfg(test)]
