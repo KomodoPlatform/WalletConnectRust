@@ -63,6 +63,7 @@ mod tests {
             },
             "namespaces": {
                 "eip155": {
+                    "chains": [],
                     "accounts": [
                         "eip155:5:0xBA5BA3955463ADcc7aa3E33bbdfb8A68e0933dD8"
                     ],

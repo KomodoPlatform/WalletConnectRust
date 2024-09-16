@@ -163,7 +163,7 @@ impl PairingClient {
             version: VERSION.to_owned(),
             pairing: pairing_info,
         };
-        // Use a block to ensure the mutex is released as soon as possible
+
         {
             let mut pairings = self.pairings.lock().await;
             pairings.insert(topic.clone().to_string(), pairing);
@@ -282,6 +282,7 @@ impl PairingClient {
     /// such as handling responses and requests, since the pairing's sym_key
     ///  is required for encoding outgoing messages and decoding incoming ones.
     pub async fn delete(&self, topic: &str, client: &Client) -> Result<(), PairingClientError> {
+        // Use a block to ensure the mutex is released as soon as possible
         println!("Attempting to unsubscribe from topic: {topic}");
         {
             client
