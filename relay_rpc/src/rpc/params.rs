@@ -318,7 +318,7 @@ impl ResponseParamsError {
             | Self::SessionPropose(_data)
             | Self::SessionRequest(_data)
             | Self::PairingDelete(_data)
-            | Self::PairingExtend(_data) => self.irn_metadata().clone(),
+            | Self::PairingExtend(_data) => self.irn_metadata(),
         }
     }
 }

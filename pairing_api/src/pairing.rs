@@ -76,7 +76,6 @@ pub struct PairingInfo {
 }
 
 /// Represents a complete pairing including symmetric key and version.
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pairing {
     pub sym_key: String,
@@ -99,7 +98,7 @@ impl Pairing {
             methods: parsed.methods,
             expiry,
             relay,
-            topic: parsed.topic.clone(),
+            topic: parsed.topic,
             peer_metadata: None, // We don't have peer metadata at this point
         };
 
@@ -158,7 +157,7 @@ impl PairingClient {
 
         let uri = Self::generate_uri(&pairing_info, &sym_key);
         let pairing = Pairing {
-            sym_key: sym_key.clone(),
+            sym_key,
             version: VERSION.to_owned(),
             pairing: pairing_info,
         };
@@ -173,7 +172,6 @@ impl PairingClient {
 
     /// for responder to pair a pairing created by a proposer
     pub async fn pair(&self, url: &str, activate: bool) -> Result<Topic, PairingClientError> {
-        println!("Attempting to pair with URI: {}", url);
         let mut pairing = Pairing::try_from_url(url)?;
         let topic = pairing.pairing.topic.clone();
 
@@ -268,7 +266,6 @@ impl PairingClient {
                 .map_err(PairingClientError::SubscriptionError)?;
         };
 
-        {};
         let mut pairings = self.pairings.lock().await;
         pairings.remove(topic);
 
@@ -334,8 +331,6 @@ impl PairingClient {
         self.publish_payload(topic, irn_metadata, Payload::Request(request), client)
             .await?;
 
-        println!("Otbound request sent!\n");
-
         Ok(())
     }
 
@@ -358,8 +353,6 @@ impl PairingClient {
         // Publish the encrypted message
         self.publish_payload(topic, irn_metadata, Payload::Response(response), client)
             .await?;
-
-        println!("\nOutbound request sent!");
 
         Ok(())
     }
@@ -416,16 +409,10 @@ impl PairingClient {
             .map(|method_group| format!("[{}]", method_group.join(",")))
             .collect::<Vec<_>>()
             .join(",");
-        let expiry_timestamp_str = pairing.expiry.to_string();
 
         format!(
             "wc:{}@{}?symKey={}&methods={}&relay-protocol={}&expiryTimestamp={}",
-            pairing.topic,
-            VERSION,
-            sym_key,
-            methods_str,
-            pairing.relay.protocol,
-            expiry_timestamp_str
+            pairing.topic, VERSION, sym_key, methods_str, pairing.relay.protocol, pairing.expiry
         )
     }
 }
