@@ -288,3 +288,37 @@ impl TryFrom<ResponseParamsError> for ResponseParams {
         Ok(Self::Err(serde_json::to_value(value)?))
     }
 }
+
+impl ResponseParamsError {
+    pub fn error(&self) -> ErrorData {
+        match self {
+            Self::SessionPing(data)
+            | Self::PairingPing(data)
+            | Self::SessionEvent(data)
+            | Self::SessionExtend(data)
+            | Self::SessionSettle(data)
+            | Self::SessionUpdate(data)
+            | Self::SessionDelete(data)
+            | Self::SessionPropose(data)
+            | Self::SessionRequest(data)
+            | Self::PairingDelete(data)
+            | Self::PairingExtend(data) => data.clone(),
+        }
+    }
+
+    pub fn irn_metadata(&self) -> IrnMetadata {
+        match self {
+            Self::SessionPing(_data)
+            | Self::PairingPing(_data)
+            | Self::SessionEvent(_data)
+            | Self::SessionExtend(_data)
+            | Self::SessionSettle(_data)
+            | Self::SessionUpdate(_data)
+            | Self::SessionDelete(_data)
+            | Self::SessionPropose(_data)
+            | Self::SessionRequest(_data)
+            | Self::PairingDelete(_data)
+            | Self::PairingExtend(_data) => self.irn_metadata().clone(),
+        }
+    }
+}
