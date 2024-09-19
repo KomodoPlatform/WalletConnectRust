@@ -1,5 +1,5 @@
 use {
-    pairing_api::PairingClient,
+    pairing_api::{PairingClient, PairingClientError},
     relay_client::{
         error::ClientError,
         websocket::{Client, CloseFrame, ConnectionHandler, PublishedMessage},
@@ -100,12 +100,11 @@ async fn main() -> anyhow::Result<()> {
     // Subscribe to the pairing topic
     println!("\nSubscribing to topic: {}", topic);
     client1
-        .subscribe(topic.clone().into())
+        .subscribe(topic.clone())
         .await
         .map_err(PairingClientError::SubscriptionError)?;
     println!("\nSuccessfully subscribed to topic: {:?}", topic);
 
-    let pairing = pairing_client.get_pairing(topic.as_ref()).await.unwrap();
     let key = pairing_client.sym_key(topic.as_ref()).await.unwrap();
     let receiver_handle = spawn(spawn_published_message_recv_loop(
         client1,
@@ -190,7 +189,7 @@ async fn pair_from_uri(pairing_client: &PairingClient, client: &Client) -> Topic
         )
         .await
         .unwrap();
-    client.subscribe(topic).await.unwrap();
+    client.subscribe(topic.clone()).await.unwrap();
     topic
 }
 
