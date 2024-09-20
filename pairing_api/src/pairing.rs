@@ -4,7 +4,7 @@ use {
         Methods,
     },
     chrono::Utc,
-    rand::{rngs::OsRng, RngCore},
+    rand::{rngs::OsRng, Rng},
     relay_client::{websocket::Client, MessageIdGenerator},
     relay_rpc::{
         domain::{MessageId, Topic},
@@ -418,9 +418,7 @@ impl PairingClient {
 }
 
 fn gen_sym_key() -> String {
-    let mut sym_key = [0u8; 32];
-    OsRng.fill_bytes(&mut sym_key);
-    hex::encode(sym_key)
+    hex::encode(OsRng.gen::<[u8; 32]>())
 }
 
 #[cfg(test)]
