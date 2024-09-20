@@ -111,15 +111,9 @@ impl Pairing {
 }
 
 /// Client for managing WalletConnect pairings.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct PairingClient {
     pub pairings: Arc<Mutex<HashMap<String, Pairing>>>,
-}
-
-impl Default for PairingClient {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl PairingClient {
