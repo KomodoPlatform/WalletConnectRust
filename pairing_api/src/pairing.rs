@@ -396,12 +396,12 @@ impl PairingClient {
 
     /// Private function to generate a WalletConnect URI.
     fn generate_uri(pairing: &PairingInfo, sym_key: &str) -> String {
-        let mut url = String::from(format!(
+        let mut url = format!(
             "wc:{}@{}?symKey={}&relay-protocol={}&expiryTimestamp={}",
-            pairing.topic, VERSION, sym_key, methods_str, pairing.relay.protocol, pairing.expiry
-        ));
+            pairing.topic, VERSION, sym_key, pairing.relay.protocol, pairing.expiry
+        );
 
-        if pairing.methods.0.len() > 0 {
+        if pairing.methods.0.is_empty() {
             let methods_str = pairing
                 .methods
                 .0
@@ -411,7 +411,9 @@ impl PairingClient {
                 .join(",");
 
             url.push_str(&format!("&methods={methods_str}"));
-        }
+        };
+
+        url
     }
 }
 
