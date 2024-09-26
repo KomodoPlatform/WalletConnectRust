@@ -401,7 +401,7 @@ impl PairingClient {
             pairing.topic, VERSION, sym_key, pairing.relay.protocol, pairing.expiry
         );
 
-        if pairing.methods.0.is_empty() {
+        if !pairing.methods.0.is_empty() {
             let methods_str = pairing
                 .methods
                 .0
