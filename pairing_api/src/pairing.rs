@@ -120,7 +120,7 @@ impl PairingClient {
     /// initializes the client with persisted storage and a network connection
     pub fn new() -> Self {
         Self {
-            pairings: Arc::new(HashMap::new().into()),
+            pairings: Default::default(),
         }
     }
 

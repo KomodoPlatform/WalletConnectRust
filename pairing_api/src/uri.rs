@@ -88,14 +88,13 @@ pub fn parse_wc_uri(uri: &str) -> Result<ParsedWcUri, ParseError> {
         .ok_or(ParseError::MissingRelayProtocol)?;
     let relay_data = params.remove("relay-data");
 
-    let expiry_timestamp = match params.remove("expiryTimestamp").map(|t| {
-        t.parse::<u64>()
-            .map_err(|_| ParseError::InvalidExpiryTimestamp)
-    }) {
-        None => Utc::now().timestamp() as u64 + EXPIRY_5_MINS,
-
-        Some(time) => time?,
-    };
+    let expiry_timestamp = params.remove("expiryTimestamp").map_or(
+        Ok(Utc::now().timestamp() as u64 + EXPIRY_5_MINS),
+        |t| {
+            t.parse::<u64>()
+                .map_err(|_| ParseError::InvalidExpiryTimestamp)
+        },
+    )?;
 
     // Check for unexpected parameters
     if !params.is_empty() {
