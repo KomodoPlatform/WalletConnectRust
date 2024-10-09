@@ -178,6 +178,7 @@ async fn spawn_published_message_recv_loop(
     }
 }
 
+/// For a session Controller to pair with a session
 async fn pair_from_uri(pairing_client: &PairingClient, client: &Client) -> Topic {
     let topic = pairing_client
         .pair(
@@ -193,22 +194,23 @@ async fn pair_from_uri(pairing_client: &PairingClient, client: &Client) -> Topic
     topic
 }
 
-// async fn create_pairing(pairing_client: &PairingClient) -> Topic {
-//     let metadata = Metadata {
-//         description: "A decentralized application that enables secure
-//         communication and transactions."
-//             .to_string(),
-//         url: "https://127.0.0.1:3000".to_string(),
-//         icons: vec![
-//             "https://example-dapp.com/icon1.png".to_string(),
-//             "https://example-dapp.com/icon2.png".to_string(),
-//         ],
-//         name: "Example DApp".to_string(),
-//     };
+/// For a session Proposer to createa a pairing connection url.
+#[allow(unused)]
+async fn create_pairing(pairing_client: &PairingClient) -> Topic {
+    let metadata = relay_rpc::rpc::params::Metadata {
+        description: "A decentralized application that enables secure
+         communication and transactions."
+            .to_string(),
+        url: "https://127.0.0.1:3000".to_string(),
+        icons: vec![
+            "https://example-dapp.com/icon1.png".to_string(),
+            "https://example-dapp.com/icon2.png".to_string(),
+        ],
+        name: "Example DApp".to_string(),
+    };
 
-//     let (topic, uri) = pairing_client.try_create(metadata,
-// None).await.unwrap();     println!("pairing_uri: {uri}");
+    let (topic, uri) = pairing_client.create(metadata, None).await.unwrap();
+    println!("pairing_uri: {uri}");
 
-//     topic
-// }
-//
+    topic
+}

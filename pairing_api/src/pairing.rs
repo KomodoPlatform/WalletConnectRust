@@ -38,7 +38,7 @@ use {
 /// Duration for short-term expiry (5 minutes).
 pub(crate) const EXPIRY_5_MINS: u64 = 300; // 5 mins
 /// Duration for long-term expiry (30 days).
-pub(crate) const EXPIRY_30_DAYS: u64 = 30 * 60 * 60; // 30 days
+pub(crate) const EXPIRY_30_DAYS: u64 = 24 * 30 * 60 * 60; // 30 days
 /// The relay protocol used for WalletConnect communications.
 const RELAY_PROTOCOL: &str = "irn";
 /// The version of the WalletConnect protocol.
@@ -119,9 +119,7 @@ pub struct PairingClient {
 impl PairingClient {
     /// initializes the client with persisted storage and a network connection
     pub fn new() -> Self {
-        Self {
-            pairings: Default::default(),
-        }
+        Self::default()
     }
 
     /// Attempts to generate a new pairing, stores it in the client's pairing
@@ -132,7 +130,12 @@ impl PairingClient {
         metadata: Metadata,
         methods: Option<Methods>,
     ) -> Result<(Topic, String), PairingClientError> {
-        let expiry = Utc::now().timestamp() as u64 + EXPIRY_5_MINS;
+        let expiry = Utc::now().timestamp();
+        if expiry < 0 {
+            return Err(PairingClientError::TimeError(
+                "Negative timestamp".to_string(),
+            ));
+        }
 
         let topic = Topic::generate();
         let relay = Relay {
@@ -143,7 +146,7 @@ impl PairingClient {
         let pairing_info = PairingInfo {
             active: false,
             methods: methods.unwrap_or(Methods(vec![])),
-            expiry,
+            expiry: expiry as u64 + EXPIRY_5_MINS,
             relay,
             topic: topic.clone().to_string(),
             peer_metadata: Some(metadata),
@@ -169,32 +172,37 @@ impl PairingClient {
         let mut pairing = Pairing::try_from_url(url)?;
         let topic = pairing.pairing.topic.clone();
 
-        {
-            let mut pairings = self.pairings.lock().await;
+        let mut pairings = self.pairings.lock().await;
 
-            // Check if the pairing already exists
-            if let Some(existing_pairing) = pairings.get_mut(&topic) {
-                // Reactivate the pairing if needed
-                if activate {
-                    existing_pairing.pairing.active = true;
-                }
-
-                // If the pairing is already active, return an error
-                if existing_pairing.pairing.active {
-                    return Err(PairingClientError::PairingTopicAlreadyExists);
-                }
+        // Check if the pairing already exists
+        if let Some(existing_pairing) = pairings.get_mut(&topic) {
+            // If the pairing is already active, return an error
+            if existing_pairing.pairing.active {
+                return Err(PairingClientError::PairingTopicAlreadyExists);
             }
-        }
 
-        {
-            // Activate the pairing if requested
+            // Reactivate the pairing if needed
             if activate {
-                pairing.pairing.active = true;
+                let expiry = Utc::now().timestamp();
+                if expiry < 0 {
+                    return Err(PairingClientError::TimeError(
+                        "Negative timestamp".to_string(),
+                    ));
+                }
+
+                existing_pairing.pairing.active = true;
+                existing_pairing.pairing.expiry = expiry as u64 + EXPIRY_30_DAYS;
             }
 
-            let mut pairings = self.pairings.lock().await;
-            pairings.insert(topic.clone(), pairing);
+            return Ok(topic.into());
         }
+
+        // Activate the pairing if requested
+        if activate {
+            pairing.pairing.active = true;
+        }
+
+        pairings.insert(topic.clone(), pairing);
 
         Ok(topic.into())
     }
@@ -217,12 +225,17 @@ impl PairingClient {
 
     /// for either to activate a previously created pairing
     pub async fn activate(&self, topic: &str) -> Result<(), PairingClientError> {
-        let expiry = Utc::now().timestamp() as u64 + EXPIRY_30_DAYS;
+        let expiry = Utc::now().timestamp();
+        if expiry < 0 {
+            return Err(PairingClientError::TimeError(
+                "Negative timestamp".to_string(),
+            ));
+        };
 
         let mut pairings = self.pairings.lock().await;
         if let Some(pairing) = pairings.get_mut(topic) {
             pairing.pairing.active = true;
-            pairing.pairing.expiry = expiry;
+            pairing.pairing.expiry = expiry as u64 + EXPIRY_30_DAYS;
 
             Ok(())
         } else {
@@ -251,8 +264,6 @@ impl PairingClient {
     /// such as handling responses and requests, since the pairing's sym_key
     ///  is required for encoding outgoing messages and decoding incoming ones.
     pub async fn delete(&self, topic: &str, client: &Client) -> Result<(), PairingClientError> {
-        // Use a block to ensure the mutex is released as soon as possible
-        println!("Attempting to unsubscribe from topic: {topic}");
         {
             client
                 .unsubscribe(topic.into())
@@ -425,8 +436,7 @@ fn gen_sym_key() -> String {
 mod test {
     use super::*;
 
-    #[tokio::test]
-    async fn test_pairing() {
+    fn test_pairing() {
         let pairing = Pairing::try_from_url(
             "wc:b99c41b1219a6c3131f2960e64cc015900b6880b49470e43bf14e9e520bd922d@2?
                 expiryTimestamp=1725467415&relay-protocol=irn&

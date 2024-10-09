@@ -97,10 +97,8 @@ pub fn parse_wc_uri(uri: &str) -> Result<ParsedWcUri, ParseError> {
     )?;
 
     // Check for unexpected parameters
-    if !params.is_empty() {
-        return Err(ParseError::UnexpectedParameter(
-            params.keys().next().unwrap().clone(),
-        ));
+    if let Some(unexpected_key) = params.keys().next() {
+        return Err(ParseError::UnexpectedParameter(unexpected_key.clone()));
     }
 
     Ok(ParsedWcUri {
