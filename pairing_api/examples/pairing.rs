@@ -149,7 +149,7 @@ async fn spawn_published_message_recv_loop(
                         .await
                         .unwrap();
                     // send a request to delete pairing from store.
-                    pairing_client.delete(&topic, &client).await.unwrap();
+                    pairing_client.delete(&topic).await;
                 }
                 Params::PairingExtend(data) => {
                     let extend_request = ResponseParamsSuccess::PairingExtend(true);
