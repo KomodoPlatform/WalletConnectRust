@@ -303,7 +303,12 @@ impl PairingClient {
             };
         }
 
-        self.delete(topic, client).await?;
+        {
+            client
+                .unsubscribe(topic.into())
+                .await
+                .map_err(PairingClientError::SubscriptionError)?;
+        };
 
         Ok(())
     }
