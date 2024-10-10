@@ -259,22 +259,12 @@ impl PairingClient {
         }
     }
 
-    /// Deletes a pairing from the store and subscribe from topic.
+    /// Deletes a pairing from the store and unsubscribe from topic.
     /// This should be done only after completing all necessary actions,
     /// such as handling responses and requests, since the pairing's sym_key
     ///  is required for encoding outgoing messages and decoding incoming ones.
-    pub async fn delete(&self, topic: &str, client: &Client) -> Result<(), PairingClientError> {
-        {
-            client
-                .unsubscribe(topic.into())
-                .await
-                .map_err(PairingClientError::SubscriptionError)?;
-        };
-
-        let mut pairings = self.pairings.lock().await;
-        pairings.remove(topic);
-
-        Ok(())
+    pub async fn delete(&self, topic: &str) {
+        self.pairings.lock().await.remove(topic);
     }
 
     /// Used to evaluate if peer is currently online. Timeout at 30 seconds
