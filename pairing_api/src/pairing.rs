@@ -436,6 +436,7 @@ fn gen_sym_key() -> String {
 mod test {
     use super::*;
 
+    #[test]
     fn test_pairing() {
         let pairing = Pairing::try_from_url(
             "wc:b99c41b1219a6c3131f2960e64cc015900b6880b49470e43bf14e9e520bd922d@2?
