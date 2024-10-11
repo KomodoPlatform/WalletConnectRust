@@ -5,6 +5,7 @@ use {
     super::{session::SettleNamespaces, IrnMetadata},
     crate::rpc::params::{Metadata, Relay},
     serde::{Deserialize, Serialize},
+    serde_json::Value,
 };
 
 pub(super) const IRN_REQUEST_METADATA: IrnMetadata = IrnMetadata {
@@ -36,6 +37,7 @@ pub struct SessionSettleRequest {
     ///
     /// Expiry should be between .now() + TTL.
     pub expiry: u64,
+    pub session_properties: Option<Value>,
 }
 
 #[cfg(test)]
@@ -80,7 +82,8 @@ mod tests {
                     ]
                 }
             },
-            "expiry": 1675734962
+            "expiry": 1675734962,
+            "sessionProperties": null
         }
         "#;
 
