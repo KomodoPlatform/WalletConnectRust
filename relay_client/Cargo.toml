@@ -5,8 +5,6 @@ edition = "2021"
 license = "Apache-2.0"
 
 [features]
-default = ["tokio-tungstenite-wasm/native-tls"]
-rustls = ["tokio-tungstenite-wasm/rustls-tls-native-roots"]
 http = ["dep:reqwest"]
 
 [dependencies]
@@ -14,7 +12,7 @@ chrono = { version = "0.4", default-features = false, features = [
     "alloc",
     "std",
 ] }
-data-encoding = "2.6.0"
+data-encoding = "2.4.0"
 futures-util = { version = "0.3", default-features = false, features = [
     "sink",
     "std",
@@ -28,7 +26,7 @@ serde_json = "1.0"
 serde_qs = "0.10"
 thiserror = "1.0"
 tokio = { version = "1.22", features = ["sync", "macros"] }
-tokio-tungstenite-wasm = { git = "https://github.com/KomodoPlatform/tokio-tungstenite-wasm.git", rev = "8fc7e2f" }
+tokio-tungstenite-wasm = { git = "https://github.com/KomodoPlatform/tokio-tungstenite-wasm.git", features = ["rustls-tls-native-roots"], rev = "8fc7e2f" }
 tokio-util = "0.7"
 url = "2.3"
 
