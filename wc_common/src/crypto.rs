@@ -129,7 +129,7 @@ where
     T: AsRef<[u8]>,
 {
     // validate sym_key len.
-    if validate_symkey_len(key.len()) {
+    if !validate_symkey_len(key.len()) {
         return Err(PayloadError::SymKeyLen(key.len()));
     }
 
