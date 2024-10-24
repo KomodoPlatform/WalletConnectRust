@@ -15,6 +15,7 @@ use {
     session_update::SessionUpdateRequest,
 };
 
+pub mod arbitrary;
 pub mod pairing_delete;
 pub mod pairing_extend;
 pub mod pairing_ping;
@@ -132,6 +133,7 @@ macro_rules! impl_relay_protocol_metadata {
                         [<$param_type>]::PairingDelete(_) => pairing_delete::[<IRN_ $meta:upper _METADATA>],
                         [<$param_type>]::PairingExtend(_) => pairing_extend::[<IRN_ $meta:upper _METADATA>],
                         [<$param_type>]::PairingPing(_) => pairing_ping::[<IRN_ $meta:upper _METADATA>],
+                        [<$param_type>]::Arbitrary(_) => arbitrary::[<IRN_ $meta:upper _METADATA>],
                     }
                 }
             }
@@ -182,6 +184,9 @@ macro_rules! impl_relay_protocol_helpers {
                         tag if tag == pairing_ping::IRN_RESPONSE_METADATA.tag => {
                             Ok(Self::PairingPing(serde_json::from_value(value)?))
                         }
+                        tag if tag == arbitrary::IRN_RESPONSE_METADATA.tag => {
+                            Ok(Self::Arbitrary(serde_json::from_value(value)?))
+                        }
                         _ => Err(ParamsError::ResponseTag(tag)),
                     }
                 }
@@ -205,10 +210,10 @@ pub enum RequestParams {
     SessionEvent(SessionEventRequest),
     SessionDelete(SessionDeleteRequest),
     SessionPing(()),
-
     PairingExtend(PairingExtendRequest),
     PairingDelete(PairingDeleteRequest),
     PairingPing(PairingPingRequest),
+    Arbitrary(Value),
 }
 
 impl_relay_protocol_metadata!(RequestParams, request);
@@ -218,8 +223,6 @@ impl From<RequestParams> for Params {
         match value {
             RequestParams::PairingPing(param) => Params::PairingPing(param),
             RequestParams::PairingDelete(param) => Params::PairingDelete(param),
-            RequestParams::PairingExtend(param) => Params::PairingExtend(param),
-
             RequestParams::SessionPing(()) => Params::SessionPing(()),
             RequestParams::SessionPropose(param) => Params::SessionPropose(param),
             RequestParams::SessionSettle(param) => Params::SessionSettle(param),
@@ -228,6 +231,8 @@ impl From<RequestParams> for Params {
             RequestParams::SessionRequest(param) => Params::SessionRequest(param),
             RequestParams::SessionEvent(param) => Params::SessionEvent(param),
             RequestParams::SessionDelete(param) => Params::SessionDelete(param),
+            RequestParams::PairingExtend(param) => Params::PairingExtend(param),
+            RequestParams::Arbitrary(_param) => unreachable!(),
         }
     }
 }
@@ -248,6 +253,7 @@ pub enum ResponseParamsSuccess {
     PairingExtend(bool),
     PairingDelete(bool),
     PairingPing(bool),
+    Arbitrary(Value),
 }
 
 impl_relay_protocol_metadata!(ResponseParamsSuccess, response);
@@ -273,10 +279,10 @@ pub enum ResponseParamsError {
     SessionEvent(ErrorData),
     SessionDelete(ErrorData),
     SessionPing(ErrorData),
-
     PairingDelete(ErrorData),
     PairingExtend(ErrorData),
     PairingPing(ErrorData),
+    Arbitrary(ErrorData),
 }
 impl_relay_protocol_metadata!(ResponseParamsError, response);
 impl_relay_protocol_helpers!(ResponseParamsError);
@@ -302,7 +308,8 @@ impl ResponseParamsError {
             | Self::SessionPropose(data)
             | Self::SessionRequest(data)
             | Self::PairingDelete(data)
-            | Self::PairingExtend(data) => data.clone(),
+            | Self::PairingExtend(data)
+            | Self::Arbitrary(data) => data.clone(),
         }
     }
 
@@ -318,7 +325,8 @@ impl ResponseParamsError {
             | Self::SessionPropose(_data)
             | Self::SessionRequest(_data)
             | Self::PairingDelete(_data)
-            | Self::PairingExtend(_data) => self.irn_metadata(),
+            | Self::PairingExtend(_data)
+            | Self::Arbitrary(_data) => self.irn_metadata(),
         }
     }
 }

@@ -113,6 +113,10 @@ impl<'a> EncodingParams<'a> {
     }
 }
 
+#[inline]
+fn validate_symkey_len(len: usize) -> bool {
+    len == SYM_KEY_LENGTH
+}
 /// Encrypts and encodes the plain-text payload.
 ///
 /// TODO: RNG as an input
@@ -125,7 +129,7 @@ where
     T: AsRef<[u8]>,
 {
     // validate sym_key len.
-    if key.len() != 32 {
+    if validate_symkey_len(key.len()) {
         return Err(PayloadError::SymKeyLen(key.len()));
     }
 

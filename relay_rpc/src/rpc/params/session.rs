@@ -170,10 +170,6 @@ impl ProposeNamespaces {
             ));
         }
 
-        if required.is_empty() {
-            return Ok(());
-        }
-
         for (name, other) in required.iter() {
             let ours = self
                 .get(name)

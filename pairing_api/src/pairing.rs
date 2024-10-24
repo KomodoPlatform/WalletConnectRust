@@ -35,10 +35,10 @@ use {
     wc_common::{encrypt_and_encode, EnvelopeType},
 };
 
-/// Duration for short-term expiry (5 minutes).
+// Duration for short-term expiry (5 minutes) in seconds.
 pub(crate) const EXPIRY_5_MINS: u64 = 300; // 5 mins
-/// Duration for long-term expiry (30 days).
-pub(crate) const EXPIRY_30_DAYS: u64 = 24 * 30 * 60 * 60; // 30 days
+/// The relay protocol used for WalletConnect communications.
+pub(crate) const EXPIRY_30_DAYS: u64 = 24 * 30 * 60 * 60;
 /// The relay protocol used for WalletConnect communications.
 const RELAY_PROTOCOL: &str = "irn";
 /// The version of the WalletConnect protocol.
@@ -48,17 +48,19 @@ const VERSION: &str = "2";
 #[derive(Debug, thiserror::Error)]
 pub enum PairingClientError {
     #[error("Subscription error")]
-    SubscriptionError(relay_client::error::Error<SubscriptionError>),
+    SubscriptionError(#[from] relay_client::error::Error<SubscriptionError>),
     #[error("Topic not found")]
     PairingNotFound,
     #[error("Pairing with topic already exists")]
     PairingTopicAlreadyExists,
     #[error("PublishError error")]
-    PingError(relay_client::error::Error<PublishError>),
+    PingError(#[from] relay_client::error::Error<PublishError>),
     #[error("Encode error")]
     EncodeError(String),
+    #[error("Encode error")]
+    DecodeError(String),
     #[error("Unexpected parameter")]
-    ParseError(ParseError),
+    ParseError(#[from] ParseError),
     #[error("Time error")]
     TimeError(String),
 }
@@ -85,7 +87,7 @@ pub struct Pairing {
 
 impl Pairing {
     pub fn try_from_url(url: &str) -> Result<Self, PairingClientError> {
-        let parsed = parse_wc_uri(url).map_err(PairingClientError::ParseError)?;
+        let parsed = parse_wc_uri(url)?;
 
         let expiry = parsed.expiry_timestamp;
         let relay = Relay {
@@ -287,10 +289,7 @@ impl PairingClient {
         }
 
         {
-            client
-                .unsubscribe(topic.into())
-                .await
-                .map_err(PairingClientError::SubscriptionError)?;
+            client.unsubscribe(topic.into()).await?;
         };
 
         Ok(())
@@ -365,14 +364,13 @@ impl PairingClient {
                 .get(topic)
                 .ok_or_else(|| PairingClientError::PairingNotFound)?;
             hex::decode(pairing.sym_key.clone()).map_err(|err| {
-                PairingClientError::EncodeError(format!("Failed to decode sym_key: {:?}", err))
+                PairingClientError::DecodeError(format!("Failed to decode sym_key: {:?}", err))
             })?
         };
 
         let payload = serde_json::to_string(&payload)
             .map_err(|err| PairingClientError::EncodeError(err.to_string()))?;
         let message = encrypt_and_encode(EnvelopeType::Type0, payload, &sym_key)
-            .map_err(|e| anyhow::anyhow!(e))
             .map_err(|err| PairingClientError::EncodeError(err.to_string()))?;
 
         // Publish the encrypted message
@@ -386,8 +384,7 @@ impl PairingClient {
                     Duration::from_secs(irn_metadata.ttl),
                     irn_metadata.prompt,
                 )
-                .await
-                .map_err(PairingClientError::PingError)?;
+                .await?;
         };
 
         Ok(())

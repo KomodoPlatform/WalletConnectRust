@@ -194,7 +194,7 @@ async fn pair_from_uri(pairing_client: &PairingClient, client: &Client) -> Topic
     topic
 }
 
-/// For a session Proposer to createa a pairing connection url.
+/// For a Session Proposer to create a pairing connection url.
 #[allow(unused)]
 async fn create_pairing(pairing_client: &PairingClient) -> Topic {
     let metadata = relay_rpc::rpc::params::Metadata {
