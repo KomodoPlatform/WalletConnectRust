@@ -43,6 +43,7 @@ pub(crate) const EXPIRY_30_DAYS: u64 = 24 * 30 * 60 * 60;
 const RELAY_PROTOCOL: &str = "irn";
 /// The version of the WalletConnect protocol.
 const VERSION: &str = "2";
+const PAIRING_DELETE_ERROR_CODE: i64 = 6000;
 
 /// Errors that can occur during pairing operations.
 #[derive(Debug, thiserror::Error)]
@@ -65,23 +66,32 @@ pub enum PairingClientError {
     TimeError(String),
 }
 
-/// Detailed information about a pairing.
+/// Information about a pairing connection.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PairingInfo {
+    /// Topic associated with the pairing.
     pub topic: String,
+    /// Relay information used for communication.
     pub relay: Relay,
+    /// Metadata of the peer (if available).
     pub peer_metadata: Option<Metadata>,
+    /// Expiry time of the pairing (in seconds).
     pub expiry: u64,
+    /// Indicates whether the pairing is active.
     pub active: bool,
+    /// Supported methods for the pairing.
     pub methods: Methods,
 }
 
-/// Represents a complete pairing including symmetric key and version.
+/// Complete pairing including symmetric key and version.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pairing {
+    /// Symmetric key used for encryption.
     pub sym_key: String,
+    /// Version of the pairing protocol.
     pub version: String,
+    /// Information about the pairing connection.
     pub pairing: PairingInfo,
 }
 
@@ -279,7 +289,7 @@ impl PairingClient {
                 self.publish_request(
                     topic,
                     RequestParams::PairingDelete(PairingDeleteRequest {
-                        code: 6000,
+                        code: PAIRING_DELETE_ERROR_CODE,
                         message: "User requested disconnect".to_owned(),
                     }),
                     client,

@@ -28,7 +28,7 @@ fn get_caip2_regex() -> &'static Regex {
 /// https://specs.walletconnect.com/2.0/specs/clients/sign/namespaces
 /// and some additional variants.
 #[derive(Debug, thiserror::Error, Eq, PartialEq)]
-pub enum ProposeNamespaceError {
+pub enum NamespaceError {
     #[error("Required chains are not supported: {0}")]
     UnsupportedChains(String),
     #[error("Chains must not be empty")]
@@ -58,7 +58,7 @@ pub struct ProposeNamespace {
 }
 
 impl ProposeNamespace {
-    fn supported(&self, required: &Self) -> Result<(), ProposeNamespaceError> {
+    fn supported(&self, required: &Self) -> Result<(), NamespaceError> {
         let join_err = |required: &BTreeSet<String>, ours: &BTreeSet<String>| -> String {
             return required
                 .difference(ours)
@@ -69,7 +69,7 @@ impl ProposeNamespace {
 
         // validate chains
         if !self.chains.is_superset(&required.chains) {
-            return Err(ProposeNamespaceError::UnsupportedChains(join_err(
+            return Err(NamespaceError::UnsupportedChains(join_err(
                 &required.chains,
                 &self.chains,
             )));
@@ -77,7 +77,7 @@ impl ProposeNamespace {
 
         // validate methods
         if !self.methods.is_superset(&required.methods) {
-            return Err(ProposeNamespaceError::UnsupportedMethods(join_err(
+            return Err(NamespaceError::UnsupportedMethods(join_err(
                 &required.methods,
                 &self.methods,
             )));
@@ -85,7 +85,7 @@ impl ProposeNamespace {
 
         // validate events
         if !self.events.is_superset(&required.events) {
-            return Err(ProposeNamespaceError::UnsupportedEvents(join_err(
+            return Err(NamespaceError::UnsupportedEvents(join_err(
                 &required.events,
                 &self.events,
             )));
@@ -98,11 +98,11 @@ impl ProposeNamespace {
         &self,
         namespace: &str,
         reference: Option<&str>,
-    ) -> Result<(), ProposeNamespaceError> {
+    ) -> Result<(), NamespaceError> {
         // https://specs.walletconnect.com/2.0/specs/clients/sign/
         // namespaces#13-chains-might-be-omitted-if-the-caip-2-is-defined-in-the-index
         match (reference, self.chains.is_empty()) {
-            (None, true) => return Err(ProposeNamespaceError::UnsupportedChainsEmpty),
+            (None, true) => return Err(NamespaceError::UnsupportedChainsEmpty),
             (Some(_), true) => return Ok(()),
             _ => {}
         }
@@ -111,7 +111,7 @@ impl ProposeNamespace {
         for chain in self.chains.iter() {
             let captures = caip_regex
                 .captures(chain)
-                .ok_or_else(|| ProposeNamespaceError::UnsupportedChainsCaip2(chain.to_string()))?;
+                .ok_or_else(|| NamespaceError::UnsupportedChainsCaip2(chain.to_string()))?;
 
             let chain_namespace = captures
                 .name("namespace")
@@ -119,23 +119,20 @@ impl ProposeNamespace {
                 .as_str();
 
             if namespace != chain_namespace {
-                return Err(ProposeNamespaceError::UnsupportedChainsNamespace(
+                return Err(NamespaceError::UnsupportedChainsNamespace(
                     namespace.to_string(),
                     chain_namespace.to_string(),
                 ));
             }
 
-            let chain_reference =
-                captures
-                    .name("reference")
-                    .map(|m| m.as_str())
-                    .ok_or_else(|| {
-                        ProposeNamespaceError::UnsupportedChainsCaip2(namespace.to_string())
-                    })?;
+            let chain_reference = captures
+                .name("reference")
+                .map(|m| m.as_str())
+                .ok_or_else(|| NamespaceError::UnsupportedChainsCaip2(namespace.to_string()))?;
 
             if let Some(r) = reference {
                 if r != chain_reference {
-                    return Err(ProposeNamespaceError::UnsupportedChainsCaip2(
+                    return Err(NamespaceError::UnsupportedChainsCaip2(
                         namespace.to_string(),
                     ));
                 }
@@ -163,9 +160,9 @@ impl ProposeNamespaces {
     /// Ensures that application is compatible with the requester requirements.
     ///
     /// Implementation must support at least all the elements in `required`.
-    pub fn supported(&self, required: &ProposeNamespaces) -> Result<(), ProposeNamespaceError> {
+    pub fn supported(&self, required: &ProposeNamespaces) -> Result<(), NamespaceError> {
         if self.is_empty() {
-            return Err(ProposeNamespaceError::UnsupportedNamespace(
+            return Err(NamespaceError::UnsupportedNamespace(
                 "None supported".to_string(),
             ));
         }
@@ -173,19 +170,19 @@ impl ProposeNamespaces {
         for (name, other) in required.iter() {
             let ours = self
                 .get(name)
-                .ok_or_else(|| ProposeNamespaceError::UnsupportedNamespace(name.to_string()))?;
+                .ok_or_else(|| NamespaceError::UnsupportedNamespace(name.to_string()))?;
             ours.supported(other)?;
         }
 
         Ok(())
     }
 
-    pub fn caip2_validate(&self) -> Result<(), ProposeNamespaceError> {
+    pub fn caip2_validate(&self) -> Result<(), NamespaceError> {
         let caip_regex = get_caip2_regex();
         for (name, namespace) in self.deref() {
             let captures = caip_regex
                 .captures(name)
-                .ok_or_else(|| ProposeNamespaceError::UnsupportedNamespaceKey(name.to_string()))?;
+                .ok_or_else(|| NamespaceError::UnsupportedNamespaceKey(name.to_string()))?;
 
             let name = captures
                 .name("namespace")
@@ -203,7 +200,6 @@ impl ProposeNamespaces {
 
 /// TODO: some validation from `ProposeNamespaces` should be re-used.
 /// TODO: caip-10 validation.
-/// TODO: named errors like in `ProposeNamespaces`.
 #[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SettleNamespaces(pub BTreeMap<String, Namespace>);
@@ -216,13 +212,26 @@ impl Deref for SettleNamespaces {
     }
 }
 
-#[allow(unused)]
-#[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct SettleNamespace {
-    pub accounts: BTreeSet<String>,
-    pub methods: BTreeSet<String>,
-    pub events: BTreeSet<String>,
+impl SettleNamespaces {
+    pub fn caip2_validate(&self) -> Result<(), NamespaceError> {
+        let caip_regex = get_caip2_regex();
+        for (name, namespace) in self.deref() {
+            let captures = caip_regex
+                .captures(name)
+                .ok_or_else(|| NamespaceError::UnsupportedNamespaceKey(name.to_string()))?;
+
+            let name = captures
+                .name("namespace")
+                .expect("namespace name missing: unexpected error")
+                .as_str();
+
+            let reference = captures.name("reference").map(|m| m.as_str());
+
+            namespace.chains_caip2_validate(name, reference)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone, Default)]
@@ -232,6 +241,57 @@ pub struct Namespace {
     pub accounts: Option<BTreeSet<String>>,
     pub methods: BTreeSet<String>,
     pub events: BTreeSet<String>,
+}
+
+impl Namespace {
+    pub fn chains_caip2_validate(
+        &self,
+        namespace: &str,
+        reference: Option<&str>,
+    ) -> Result<(), NamespaceError> {
+        // https://specs.walletconnect.com/2.0/specs/clients/sign/
+        // namespaces#13-chains-might-be-omitted-if-the-caip-2-is-defined-in-the-index
+        let chains = self.chains.clone().unwrap_or_default();
+        match (reference, chains.is_empty()) {
+            (None, true) => return Err(NamespaceError::UnsupportedChainsEmpty),
+            (Some(_), true) => return Ok(()),
+            _ => {}
+        }
+
+        let caip_regex = get_caip2_regex();
+        for chain in chains.iter() {
+            let captures = caip_regex
+                .captures(chain)
+                .ok_or_else(|| NamespaceError::UnsupportedChainsCaip2(chain.to_string()))?;
+
+            let chain_namespace = captures
+                .name("namespace")
+                .expect("chain namespace name is missing: unexpected error")
+                .as_str();
+
+            if namespace != chain_namespace {
+                return Err(NamespaceError::UnsupportedChainsNamespace(
+                    namespace.to_string(),
+                    chain_namespace.to_string(),
+                ));
+            }
+
+            let chain_reference = captures
+                .name("reference")
+                .map(|m| m.as_str())
+                .ok_or_else(|| NamespaceError::UnsupportedChainsCaip2(namespace.to_string()))?;
+
+            if let Some(r) = reference {
+                if r != chain_reference {
+                    return Err(NamespaceError::UnsupportedChainsCaip2(
+                        namespace.to_string(),
+                    ));
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 // Trims json of the whitespaces and newlines.
@@ -313,13 +373,13 @@ mod tests {
         ours.chains.remove("1");
         assert_eq!(
             ours.supported(&theirs),
-            Err(ProposeNamespaceError::UnsupportedChains("1".to_string())),
+            Err(NamespaceError::UnsupportedChains("1".to_string())),
         );
 
         ours.chains.remove("2");
         assert_eq!(
             ours.supported(&theirs),
-            Err(ProposeNamespaceError::UnsupportedChains("1,2".to_string())),
+            Err(NamespaceError::UnsupportedChains("1,2".to_string())),
         );
     }
 
@@ -331,13 +391,13 @@ mod tests {
         ours.methods.remove("1");
         assert_eq!(
             ours.supported(&theirs),
-            Err(ProposeNamespaceError::UnsupportedMethods("1".to_string())),
+            Err(NamespaceError::UnsupportedMethods("1".to_string())),
         );
 
         ours.methods.remove("2");
         assert_eq!(
             ours.supported(&theirs),
-            Err(ProposeNamespaceError::UnsupportedMethods("1,2".to_string())),
+            Err(NamespaceError::UnsupportedMethods("1,2".to_string())),
         );
     }
 
@@ -349,13 +409,13 @@ mod tests {
         ours.events.remove("1");
         assert_eq!(
             ours.supported(&theirs),
-            Err(ProposeNamespaceError::UnsupportedEvents("1".to_string())),
+            Err(NamespaceError::UnsupportedEvents("1".to_string())),
         );
 
         ours.events.remove("2");
         assert_eq!(
             ours.supported(&theirs),
-            Err(ProposeNamespaceError::UnsupportedEvents("1,2".to_string())),
+            Err(NamespaceError::UnsupportedEvents("1,2".to_string())),
         );
     }
 
@@ -363,7 +423,7 @@ mod tests {
     // CAIP-2 TESTS: https://chainagnostic.org/CAIPs/caip-2
     // ========================================================================================================
     #[test]
-    fn caip2_test_cases() -> Result<(), ProposeNamespaceError> {
+    fn caip2_test_cases() -> Result<(), NamespaceError> {
         let chains = [
             // Ethereum mainnet
             "eip155:1",
@@ -392,7 +452,7 @@ mod tests {
         for chain in chains {
             caip2_regex
                 .captures(chain)
-                .ok_or_else(|| ProposeNamespaceError::UnsupportedChainsCaip2(chain.to_string()))?;
+                .ok_or_else(|| NamespaceError::UnsupportedChainsCaip2(chain.to_string()))?;
         }
 
         Ok(())
@@ -412,14 +472,14 @@ mod tests {
 
         assert_eq!(
             namespaces.caip2_validate(),
-            Err(ProposeNamespaceError::UnsupportedChainsEmpty),
+            Err(NamespaceError::UnsupportedChainsEmpty),
         );
     }
 
     /// https://specs.walletconnect.com/2.0/specs/clients/sign/namespaces#
     /// 13-chains-might-be-omitted-if-the-caip-2-is-defined-in-the-index
     #[test]
-    fn caip2_13_chains_omitted_success() -> Result<(), ProposeNamespaceError> {
+    fn caip2_13_chains_omitted_success() -> Result<(), NamespaceError> {
         let namespaces = ProposeNamespaces({
             let mut map: BTreeMap<String, ProposeNamespace> = BTreeMap::new();
             map.insert("eip155:1".to_string(), ProposeNamespace {
@@ -436,7 +496,7 @@ mod tests {
     /// https://specs.walletconnect.com/2.0/specs/clients/sign/namespaces#
     /// 14-chains-must-be-caip-2-compliant
     #[test]
-    fn caip2_14_must_be_compliant_failure() -> Result<(), ProposeNamespaceError> {
+    fn caip2_14_must_be_compliant_failure() -> Result<(), NamespaceError> {
         let namespaces = ProposeNamespaces({
             let mut map: BTreeMap<String, ProposeNamespace> = BTreeMap::new();
             map.insert("eip155".to_string(), ProposeNamespace {
@@ -448,9 +508,7 @@ mod tests {
 
         assert_eq!(
             namespaces.caip2_validate(),
-            Err(ProposeNamespaceError::UnsupportedChainsCaip2(
-                "1".to_string()
-            )),
+            Err(NamespaceError::UnsupportedChainsCaip2("1".to_string())),
         );
 
         Ok(())
@@ -459,7 +517,7 @@ mod tests {
     /// https://specs.walletconnect.com/2.0/specs/clients/sign/namespaces#
     /// 16-all-chains-in-the-namespace-must-contain-the-namespace-prefix
     #[test]
-    fn caip2_16_chain_prefix_success() -> Result<(), ProposeNamespaceError> {
+    fn caip2_16_chain_prefix_success() -> Result<(), NamespaceError> {
         let namespaces = ProposeNamespaces({
             let mut map: BTreeMap<String, ProposeNamespace> = BTreeMap::new();
             map.insert("eip155".to_string(), ProposeNamespace {
@@ -503,7 +561,7 @@ mod tests {
     /// https://specs.walletconnect.com/2.0/specs/clients/sign/namespaces#
     /// 16-all-chains-in-the-namespace-must-contain-the-namespace-prefix
     #[test]
-    fn caip2_16_chain_prefix_failure() -> Result<(), ProposeNamespaceError> {
+    fn caip2_16_chain_prefix_failure() -> Result<(), NamespaceError> {
         let namespaces = ProposeNamespaces({
             let mut map: BTreeMap<String, ProposeNamespace> = BTreeMap::new();
             map.insert("eip155".to_string(), ProposeNamespace {
@@ -515,7 +573,7 @@ mod tests {
 
         assert_eq!(
             namespaces.caip2_validate(),
-            Err(ProposeNamespaceError::UnsupportedChainsNamespace(
+            Err(NamespaceError::UnsupportedChainsNamespace(
                 "eip155".to_string(),
                 "cosmos".to_string()
             )),
@@ -527,7 +585,7 @@ mod tests {
     /// https://specs.walletconnect.com/2.0/specs/clients/sign/namespaces#
     /// 17-namespace-key-must-comply-with-caip-2-specification
     #[test]
-    fn caip2_17_namespace_key_failure() -> Result<(), ProposeNamespaceError> {
+    fn caip2_17_namespace_key_failure() -> Result<(), NamespaceError> {
         let namespaces = ProposeNamespaces({
             let mut map: BTreeMap<String, ProposeNamespace> = BTreeMap::new();
             map.insert("".to_string(), ProposeNamespace {
@@ -539,9 +597,7 @@ mod tests {
 
         assert_eq!(
             namespaces.caip2_validate(),
-            Err(ProposeNamespaceError::UnsupportedNamespaceKey(
-                "".to_string()
-            )),
+            Err(NamespaceError::UnsupportedNamespaceKey("".to_string())),
         );
 
         let namespaces = ProposeNamespaces({
@@ -555,9 +611,7 @@ mod tests {
 
         assert_eq!(
             namespaces.caip2_validate(),
-            Err(ProposeNamespaceError::UnsupportedNamespaceKey(
-                "**".to_string()
-            )),
+            Err(NamespaceError::UnsupportedNamespaceKey("**".to_string())),
         );
 
         Ok(())

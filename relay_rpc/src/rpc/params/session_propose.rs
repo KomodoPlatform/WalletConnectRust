@@ -28,6 +28,8 @@ pub struct SessionProposeRequest {
     pub relays: Vec<Relay>,
     pub proposer: Proposer,
     pub required_namespaces: ProposeNamespaces,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub optional_namespaces: Option<ProposeNamespaces>,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, Hash, Deserialize, Clone)]
