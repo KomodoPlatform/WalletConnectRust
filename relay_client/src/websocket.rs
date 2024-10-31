@@ -3,7 +3,6 @@ use tokio::spawn;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_futures::spawn_local as spawn;
 use {
-    self::connection::connection_event_loop,
     crate::{
         error::{ClientError, Error},
         ConnectionOptions,
@@ -34,7 +33,7 @@ use {
     },
 };
 pub use {
-    connection::{Connection, ConnectionControl},
+    connection::{connection_event_loop, Connection, ConnectionControl},
     fetch::*,
     inbound::*,
     outbound::*,
@@ -155,6 +154,7 @@ impl Client {
         T: ConnectionHandler,
     {
         let (control_tx, control_rx) = mpsc::unbounded_channel();
+        let control_rx = Arc::new(control_rx.into());
 
         spawn(connection_event_loop(control_rx, handler));
 
@@ -167,6 +167,7 @@ impl Client {
     /// Creates a new managed [`Client`] with the provided handler.
     pub fn new_unmanaged() -> Self {
         let (control_tx, control_rx) = mpsc::unbounded_channel();
+
         Self {
             control_tx,
             control_rx: Some(Arc::new(control_rx.into())),
