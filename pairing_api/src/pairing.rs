@@ -442,8 +442,13 @@ mod test {
         )
         .unwrap();
 
+        let sym_key =
+            hex::decode("4a7cccd69a33ac0a3debfbee49e8ff0e65edbdc2031ba600e37880f73eb5b638")
+                .unwrap()
+                .try_into()
+                .unwrap();
         let mut expected = Pairing {
-            sym_key: "4a7cccd69a33ac0a3debfbee49e8ff0e65edbdc2031ba600e37880f73eb5b638".to_owned(),
+            sym_key,
             version: "2".to_owned(),
             pairing: PairingInfo {
                 topic: "b99c41b1219a6c3131f2960e64cc015900b6880b49470e43bf14e9e520bd922d"
