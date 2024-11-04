@@ -32,7 +32,7 @@ use {
     serde::{Deserialize, Serialize},
     std::{collections::HashMap, sync::Arc, time::Duration},
     tokio::sync::Mutex,
-    wc_common::{encrypt_and_encode, EnvelopeType},
+    wc_common::{encrypt_and_encode, EnvelopeType, SymKey},
 };
 
 // Duration for short-term expiry (5 minutes) in seconds.
@@ -64,6 +64,8 @@ pub enum PairingClientError {
     ParseError(#[from] ParseError),
     #[error("Time error")]
     TimeError(String),
+    #[error("InvalidSymKey")]
+    InvalidSymKey,
 }
 
 /// Information about a pairing connection.
@@ -88,7 +90,7 @@ pub struct PairingInfo {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pairing {
     /// Symmetric key used for encryption.
-    pub sym_key: String,
+    pub sym_key: SymKey,
     /// Version of the pairing protocol.
     pub version: String,
     /// Information about the pairing connection.
@@ -98,7 +100,10 @@ pub struct Pairing {
 impl Pairing {
     pub fn try_from_url(url: &str) -> Result<Self, PairingClientError> {
         let parsed = parse_wc_uri(url)?;
-
+        let sym_key = hex::decode(parsed.sym_key).map_err(|_| PairingClientError::InvalidSymKey)?;
+        let sym_key: SymKey = sym_key
+            .try_into()
+            .map_err(|_| PairingClientError::InvalidSymKey)?;
         let expiry = parsed.expiry_timestamp;
         let relay = Relay {
             protocol: parsed.relay_protocol,
@@ -115,7 +120,7 @@ impl Pairing {
         };
 
         Ok(Pairing {
-            sym_key: parsed.sym_key,
+            sym_key,
             version: parsed.version,
             pairing: pairing_info,
         })
@@ -159,7 +164,6 @@ impl PairingClient {
             protocol: RELAY_PROTOCOL.to_owned(),
             data: None,
         };
-        let sym_key = gen_sym_key();
         let pairing_info = PairingInfo {
             active: false,
             methods: methods.unwrap_or(Methods(vec![])),
@@ -168,8 +172,8 @@ impl PairingClient {
             topic: topic.clone().to_string(),
             peer_metadata: Some(metadata),
         };
-
-        let uri = Self::generate_uri(&pairing_info, &sym_key);
+        let sym_key = gen_sym_key();
+        let uri = Self::generate_uri(&pairing_info, &hex::encode(sym_key));
         let pairing = Pairing {
             sym_key,
             version: VERSION.to_owned(),
@@ -220,10 +224,10 @@ impl PairingClient {
     }
 
     /// Retrieves the symmetric key for a given pairing topic.
-    pub async fn sym_key(&self, topic: &str) -> Result<String, PairingClientError> {
+    pub async fn sym_key(&self, topic: &str) -> Result<SymKey, PairingClientError> {
         let pairings = self.pairings.lock().await;
         if let Some(key) = pairings.get(topic) {
-            return Ok(key.sym_key.to_owned());
+            return Ok(key.sym_key);
         };
 
         Err(PairingClientError::PairingNotFound)
@@ -373,9 +377,7 @@ impl PairingClient {
             let pairing = pairings
                 .get(topic)
                 .ok_or_else(|| PairingClientError::PairingNotFound)?;
-            hex::decode(pairing.sym_key.clone()).map_err(|err| {
-                PairingClientError::DecodeError(format!("Failed to decode sym_key: {:?}", err))
-            })?
+            pairing.sym_key
         };
 
         let payload = serde_json::to_string(&payload)
@@ -423,8 +425,8 @@ impl PairingClient {
     }
 }
 
-fn gen_sym_key() -> String {
-    hex::encode(OsRng.gen::<[u8; 32]>())
+fn gen_sym_key() -> [u8; 32] {
+    OsRng.gen::<[u8; 32]>()
 }
 
 #[cfg(test)]

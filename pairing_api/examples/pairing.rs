@@ -17,7 +17,7 @@ use {
         spawn,
         sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     },
-    wc_common::decode_and_decrypt_type0,
+    wc_common::{decode_and_decrypt_type0, SymKey},
 };
 
 #[derive(StructOpt)]
@@ -96,7 +96,7 @@ async fn main() -> anyhow::Result<()> {
     // Create Pairing.
     // let topic = create_pairing(&pairing_client).await;
     // Pair
-    let topic = pair_from_uri(&pairing_client, &client1).await;
+    let topic = connect_to_pairing(&pairing_client, &client1).await;
     // Subscribe to the pairing topic
     println!("\nSubscribing to topic: {}", topic);
     client1.subscribe(topic.clone()).await?;
@@ -127,11 +127,10 @@ async fn spawn_published_message_recv_loop(
     client: Arc<Client>,
     pairing_client: Arc<PairingClient>,
     mut recv: UnboundedReceiver<PublishedMessage>,
-    key: String,
+    key: SymKey,
 ) {
     while let Some(msg) = recv.recv().await {
         let topic = msg.topic.to_string();
-        let key = hex::decode(key.clone()).unwrap();
         let message = decode_and_decrypt_type0(msg.message.as_bytes(), &key).unwrap();
         println!("\nInbound message payload={message}");
 
@@ -176,7 +175,7 @@ async fn spawn_published_message_recv_loop(
 }
 
 /// For a session Controller to pair with a session
-async fn pair_from_uri(pairing_client: &PairingClient, client: &Client) -> Topic {
+async fn connect_to_pairing(pairing_client: &PairingClient, client: &Client) -> Topic {
     let topic = pairing_client
         .pair(
             "wc:
