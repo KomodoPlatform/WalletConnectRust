@@ -19,6 +19,7 @@ futures-util = { version = "0.3", default-features = false, features = [
 ] }
 http = "1.0.0"
 pin-project = "1.0"
+rand = { version = "0.8.5", features = ["std", "small_rng"] }
 relay_rpc = { path = "../relay_rpc" }
 reqwest = { version = "0.12.2", optional = true, features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -30,16 +31,8 @@ tokio-tungstenite-wasm = { git = "https://github.com/KomodoPlatform/tokio-tungst
 tokio-util = "0.7"
 url = "2.3"
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-rand = { version = "0.7", features = ["std", "small_rng"] }
-
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys = "0.3.27"
-rand = { version = "0.7", default-features = false, features = [
-    "std",
-    "small_rng",
-    "wasm-bindgen",
-] }
 getrandom = { version = "0.2", features = ["js"] }
 wasm-bindgen = "0.2.86"
 wasm-bindgen-test = { version = "0.3.2" }

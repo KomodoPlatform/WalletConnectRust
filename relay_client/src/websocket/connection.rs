@@ -14,10 +14,9 @@ use {
     futures_util::{stream::FusedStream, Stream, StreamExt},
     std::{
         pin::Pin,
-        sync::Arc,
         task::{Context, Poll},
     },
-    tokio::sync::{mpsc::UnboundedReceiver, oneshot, Mutex},
+    tokio::sync::{mpsc::UnboundedReceiver, oneshot},
 };
 
 pub enum ConnectionControl {
@@ -34,12 +33,11 @@ pub enum ConnectionControl {
 }
 
 pub async fn connection_event_loop<T>(
-    control_rx: Arc<Mutex<UnboundedReceiver<ConnectionControl>>>,
+    mut control_rx: UnboundedReceiver<ConnectionControl>,
     mut handler: T,
 ) where
     T: ConnectionHandler,
 {
-    let mut control_rx = control_rx.lock().await;
     let mut conn = Connection::new();
 
     loop {

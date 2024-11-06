@@ -48,7 +48,7 @@ name = "http_client"
 required-features = ["client", "rpc", "http"]
 
 [[example]]
-name = "ws_unmanaged"
+name = "websocket_client_with_callback"
 required-features = ["client", "rpc"]
 
 [[example]]
