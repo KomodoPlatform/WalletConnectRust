@@ -102,7 +102,7 @@ async fn main() -> anyhow::Result<()> {
     client1.subscribe(topic.clone()).await?;
     println!("\nSuccessfully subscribed to topic: {:?}", topic);
 
-    let key = pairing_client.sym_key(topic.as_ref()).await.unwrap();
+    let key = pairing_client.sym_key(&topic).await.unwrap();
     let receiver_handle = spawn(spawn_published_message_recv_loop(
         client1,
         pairing_client,
@@ -130,7 +130,7 @@ async fn spawn_published_message_recv_loop(
     key: SymKey,
 ) {
     while let Some(msg) = recv.recv().await {
-        let topic = msg.topic.to_string();
+        let topic = msg.topic;
         let message = decode_and_decrypt_type0(msg.message.as_bytes(), &key).unwrap();
         println!("\nInbound message payload={message}");
 

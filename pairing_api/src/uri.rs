@@ -3,6 +3,7 @@ use {
     chrono::Utc,
     lazy_static::lazy_static,
     regex::Regex,
+    relay_rpc::domain::Topic,
     serde::{Deserialize, Serialize},
     std::collections::HashMap,
     thiserror::Error,
@@ -40,7 +41,7 @@ pub enum ParseError {
 
 #[derive(Debug)]
 pub struct ParsedWcUri {
-    pub topic: String,
+    pub topic: Topic,
     pub version: String,
     pub sym_key: String,
     pub methods: Methods,
@@ -64,7 +65,7 @@ pub fn parse_wc_uri(uri: &str) -> Result<ParsedWcUri, ParseError> {
             .name("topic")
             .ok_or(ParseError::MissingTopic)?
             .as_str()
-            .to_owned();
+            .into();
         let version = caps
             .name("version")
             .ok_or(ParseError::InvalidVersion)?
