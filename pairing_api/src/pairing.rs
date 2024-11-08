@@ -134,6 +134,7 @@ impl Pairing {
 /// ```rust
 /// use pairing_api::{PairingClient, Methods};
 /// use relay_rpc::rpc::params::Metadata;
+/// use pairing_api::PairingClientError;
 ///
 /// async fn create_pairing() -> Result<(), PairingClientError> {
 ///     let client = PairingClient::default();
@@ -145,10 +146,10 @@ impl Pairing {
 ///         url: "https://my-dapp.com".to_string(),
 ///     };
 ///     
-///     let methods = Some(Methods(vec![
+///     let methods = Some(Methods(vec![vec![
 ///         "eth_signTransaction".to_string(),
 ///         "personal_sign".to_string(),
-///     ]));
+///     ]]));
 ///     
 ///     let (topic, uri) = client.create(metadata, methods).await?;
 ///     

@@ -45,6 +45,10 @@ pub enum PayloadError {
     UnsupportedEnvelopeType(u8),
     #[error("Unexpected envelope type={0}, expected={1}")]
     UnexpectedEnvelopeType(u8, u8),
+    #[error("Empty data")]
+    EmptyData,
+    #[error("Empty data, start:{0} - end:{1}")]
+    InvalidIndices(usize, usize),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -65,12 +69,26 @@ struct EncodingParams<'a> {
 
 impl<'a> EncodingParams<'a> {
     fn parse_decoded(data: &'a [u8]) -> Result<Self, PayloadError> {
+        if data.is_empty() {
+            return Err(PayloadError::InitVecLen(0));
+        }
+
         let envelope_type = data[0];
         match envelope_type {
             TYPE_0 => {
                 let init_vec_start_index: usize = TYPE_INDEX + TYPE_LENGTH;
                 let init_vec_end_index: usize = init_vec_start_index + INIT_VEC_LEN;
                 let sealed_start_index: usize = init_vec_end_index;
+                if init_vec_end_index < init_vec_start_index {
+                    return Err(PayloadError::InvalidIndices(
+                        init_vec_start_index,
+                        init_vec_end_index,
+                    ));
+                }
+                if data.len() < sealed_start_index {
+                    return Err(PayloadError::InitVecLen(data.len()));
+                }
+
                 Ok(EncodingParams {
                     init_vec: data[init_vec_start_index..init_vec_end_index]
                         .try_into()
@@ -87,11 +105,26 @@ impl<'a> EncodingParams<'a> {
                 let init_vec_start_index: usize = key_end_index;
                 let init_vec_end_index: usize = init_vec_start_index + INIT_VEC_LEN;
                 let sealed_start_index: usize = init_vec_end_index;
+                if init_vec_end_index < init_vec_start_index {
+                    return Err(PayloadError::InvalidIndices(
+                        init_vec_start_index,
+                        init_vec_end_index,
+                    ));
+                }
                 let init_vec = data[init_vec_start_index..init_vec_end_index]
                     .try_into()
                     .map_err(|_| {
                         PayloadError::ParseInitVecLen(init_vec_start_index, init_vec_end_index)
                     })?;
+                if key_end_index < sealed_start_index {
+                    return Err(PayloadError::InvalidIndices(
+                        sealed_start_index,
+                        key_end_index,
+                    ));
+                }
+                if data.len() < sealed_start_index {
+                    return Err(PayloadError::InitVecLen(data.len()));
+                }
 
                 Ok(EncodingParams {
                     envelope_type: EnvelopeType::Type1 {
