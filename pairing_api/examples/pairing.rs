@@ -94,9 +94,10 @@ async fn main() -> anyhow::Result<()> {
 
     let pairing_client = Arc::new(PairingClient::new());
     // Create Pairing.
-    // let topic = create_pairing(&pairing_client).await;
+    // let topic = create_pairing(&pairing_client);
     // Pair
     let topic = connect_to_pairing(&pairing_client, &client1).await;
+
     // Subscribe to the pairing topic
     println!("\nSubscribing to topic: {}", topic);
     client1.subscribe(topic.clone()).await?;
@@ -191,7 +192,7 @@ async fn connect_to_pairing(pairing_client: &PairingClient, client: &Client) -> 
 
 /// For a Session Proposer to create a pairing connection url.
 #[allow(unused)]
-async fn create_pairing(pairing_client: &PairingClient) -> Topic {
+fn create_pairing(pairing_client: &PairingClient) -> Topic {
     let metadata = relay_rpc::rpc::params::Metadata {
         description: "A decentralized application that enables secure
          communication and transactions."

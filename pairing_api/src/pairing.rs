@@ -5,7 +5,7 @@ use {
     },
     chrono::Utc,
     dashmap::{mapref::one::Ref, DashMap},
-    rand::{rngs::OsRng, Rng},
+    rand::{rngs::OsRng, RngCore},
     relay_client::{websocket::Client, MessageIdGenerator},
     relay_rpc::{
         domain::{MessageId, Topic},
@@ -66,6 +66,8 @@ pub enum PairingClientError {
     TimeError(String),
     #[error("InvalidSymKey")]
     InvalidSymKey,
+    #[error("Error generating sym_key")]
+    GenSymKeyError,
 }
 
 /// Information about a pairing connection.
@@ -204,7 +206,10 @@ impl PairingClient {
             topic: topic.clone(),
             peer_metadata: Some(metadata),
         };
-        let sym_key = gen_sym_key();
+
+        let mut sym_key: SymKey = [0; 32];
+        fill_sym_key(&mut sym_key).map_err(|_| PairingClientError::GenSymKeyError)?;
+
         let uri = Self::generate_uri(&pairing_info, &sym_key);
         let pairing = Pairing {
             sym_key,
@@ -442,8 +447,8 @@ impl PairingClient {
 }
 
 #[inline]
-fn gen_sym_key() -> [u8; 32] {
-    OsRng.gen::<[u8; 32]>()
+fn fill_sym_key(dest: &mut SymKey) -> Result<(), rand::Error> {
+    OsRng.try_fill_bytes(dest)
 }
 
 #[cfg(test)]
