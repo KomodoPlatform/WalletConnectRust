@@ -102,7 +102,7 @@ async fn main() -> anyhow::Result<()> {
     client1.subscribe(topic.clone()).await?;
     println!("\nSuccessfully subscribed to topic: {:?}", topic);
 
-    let key = pairing_client.sym_key(&topic).await.unwrap();
+    let key = pairing_client.sym_key(&topic).unwrap();
     let receiver_handle = spawn(spawn_published_message_recv_loop(
         client1,
         pairing_client,
@@ -145,7 +145,7 @@ async fn spawn_published_message_recv_loop(
                         .await
                         .unwrap();
                     // send a request to delete pairing from store.
-                    pairing_client.delete(&topic).await;
+                    pairing_client.delete(&topic);
                 }
                 Params::PairingExtend(data) => {
                     let extend_request = ResponseParamsSuccess::PairingExtend(true);
@@ -155,7 +155,7 @@ async fn spawn_published_message_recv_loop(
                         .await
                         .unwrap();
                     // send a request to update pairing expiry in store.
-                    pairing_client.update_expiry(&topic, data.expiry).await;
+                    pairing_client.update_expiry(&topic, data.expiry);
                 }
                 Params::PairingPing(_) => {
                     let ping_request = ResponseParamsSuccess::PairingPing(true);
@@ -184,7 +184,6 @@ async fn connect_to_pairing(pairing_client: &PairingClient, client: &Client) -> 
     symKey=4a7cccd69a33ac0a3debfbee49e8ff0e65edbdc2031ba600e37880f73eb5b638",
             true,
         )
-        .await
         .unwrap();
     client.subscribe(topic.clone()).await.unwrap();
     topic
@@ -205,7 +204,7 @@ async fn create_pairing(pairing_client: &PairingClient) -> Topic {
         name: "Example DApp".to_string(),
     };
 
-    let (topic, uri) = pairing_client.create(metadata, None).await.unwrap();
+    let (topic, uri) = pairing_client.create(metadata, None).unwrap();
     println!("pairing_uri: {uri}");
 
     topic
