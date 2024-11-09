@@ -169,7 +169,9 @@ impl PairingClient {
         Self::default()
     }
 
-    fn expiry(&self) -> Result<u64, PairingClientError> {
+    /// Calculates and validates the current Unix timestamp
+    /// to use as a base for pairing expiry times.
+    fn calc_expiry(&self) -> Result<u64, PairingClientError> {
         let expiry = Utc::now().timestamp();
         if expiry < 0 {
             return Err(PairingClientError::TimeError(
@@ -188,7 +190,7 @@ impl PairingClient {
         metadata: Metadata,
         methods: Option<Methods>,
     ) -> Result<(Topic, String), PairingClientError> {
-        let expiry = self.expiry()?;
+        let expiry = self.calc_expiry()?;
         let topic = Topic::generate();
         let relay = Relay {
             protocol: RELAY_PROTOCOL.to_owned(),
@@ -224,7 +226,6 @@ impl PairingClient {
         let topic = pairing.pairing.topic.clone();
 
         let mut pairings = self.pairings.lock().await;
-
         // Check if the pairing already exists
         if let Some(existing_pairing) = pairings.get_mut(&topic) {
             // If the pairing is already active, return an error
@@ -234,7 +235,7 @@ impl PairingClient {
 
             // Reactivate the pairing if needed
             if activate {
-                let expiry = self.expiry()?;
+                let expiry = self.calc_expiry()?;
                 existing_pairing.pairing.active = true;
                 existing_pairing.pairing.expiry = expiry + EXPIRY_30_DAYS;
             }
@@ -268,7 +269,7 @@ impl PairingClient {
 
     /// for either to activate a previously created pairing
     pub async fn activate(&self, topic: &Topic) -> Result<(), PairingClientError> {
-        let expiry = self.expiry()?;
+        let expiry = self.calc_expiry()?;
         let mut pairings = self.pairings.lock().await;
         if let Some(pairing) = pairings.get_mut(topic) {
             pairing.pairing.active = true;
@@ -402,13 +403,7 @@ impl PairingClient {
         client: &Client,
     ) -> Result<(), PairingClientError> {
         // try to extend session before updating local store.
-        let sym_key = {
-            let pairings = self.pairings.lock().await;
-            let pairing = pairings
-                .get(topic)
-                .ok_or_else(|| PairingClientError::PairingNotFound)?;
-            pairing.sym_key
-        };
+        let sym_key = self.sym_key(topic).await?;
 
         let payload = serde_json::to_string(&payload)
             .map_err(|err| PairingClientError::EncodeError(err.to_string()))?;
