@@ -153,7 +153,7 @@ impl Pairing {
 ///         "personal_sign".to_string(),
 ///     ]]));
 ///     
-///     let (topic, uri) = client.create(metadata, methods).await?;
+///     let (topic, uri) = client.create(metadata, methods)?;
 ///     
 ///     // Share the URI with the responder (e.g., via QR code)
 ///     println!("Pairing URI: {}", uri);
