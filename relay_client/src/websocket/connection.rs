@@ -81,6 +81,15 @@ pub async fn connection_event_loop<T>(
                     }
 
                     StreamEvent::InboundError(error) => {
+                        if let ClientError::WebsocketClient(WebsocketClientError::Transport(err)) = &error {
+                            if err.to_string().contains("Operation timed out") {
+                                conn.reset();
+                            };
+
+                            if err.to_string().contains("unexpected end of file") {
+                                conn.reset();
+                            }
+                        }
                         handler.inbound_error(error);
                     }
 
@@ -123,7 +132,6 @@ impl Connection {
 
         match stream {
             Some(mut stream) => stream.close(None).await,
-
             None => Err(WebsocketClientError::ClosingFailed(TransportError::AlreadyClosed).into()),
         }
     }
