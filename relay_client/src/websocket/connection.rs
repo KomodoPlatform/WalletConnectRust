@@ -81,14 +81,15 @@ pub async fn connection_event_loop<T>(
                     }
 
                     StreamEvent::InboundError(error) => {
+                        println!("err: {error:?}");
                         if let ClientError::WebsocketClient(WebsocketClientError::Transport(err)) = &error {
-                            if err.to_string().contains("Operation timed out") {
+                            let err_str =  err.to_string();
+                            if err_str.contains("Operation timed out") || err_str.contains("unexpected end of file") {
+                                handler.disconnected(None);
                                 conn.reset();
                             };
 
-                            if err.to_string().contains("unexpected end of file") {
-                                conn.reset();
-                            }
+                        println!("done resetting");
                         }
                         handler.inbound_error(error);
                     }
