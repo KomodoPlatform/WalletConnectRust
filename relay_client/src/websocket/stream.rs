@@ -229,10 +229,12 @@ impl ClientStream {
         loop {
             // `poll_ready() needs to be called before each `start_send()` to make sure the
             // sink is ready to accept more data.
+            println!("poll ready");
             match self.socket.poll_ready_unpin(cx) {
                 // The sink is ready to accept more data.
                 Poll::Ready(Ok(())) => {
                     if let Poll::Ready(Some(next_message)) = self.outbound_rx.poll_recv(cx) {
+                        println!("start send");
                         if let Err(err) = self.socket.start_send_unpin(next_message) {
                             return Poll::Ready(Err(err));
                         }
