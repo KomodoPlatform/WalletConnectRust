@@ -229,24 +229,13 @@ impl PairingClient {
         let topic = pairing.pairing.topic.clone();
 
         // Check if the pairing already exists
-        if let Some(mut existing_pairing) = self.pairings.get_mut(&topic) {
-            // If the pairing is already active, return an error
-            if existing_pairing.pairing.active {
-                return Err(PairingClientError::PairingTopicAlreadyExists);
-            }
-
-            // Reactivate the pairing if needed
-            if activate {
-                existing_pairing.pairing.active = true;
-                existing_pairing.pairing.expiry = expiry + EXPIRY_30_DAYS;
-            }
-
-            return Ok(topic);
+        if self.activate(&topic).is_ok() {
+            return Ok(topic.clone());
         }
 
         // Activate the pairing if requested
         if activate {
-            pairing.pairing.active = true;
+            self.active_impl(&mut pairing, expiry)
         }
 
         self.pairings.insert(topic.clone(), pairing);
@@ -270,11 +259,15 @@ impl PairingClient {
     pub fn activate(&self, topic: &Topic) -> Result<(), PairingClientError> {
         let expiry = self.calc_expiry()?;
         if let Some(mut pairing) = self.pairings.get_mut(topic) {
-            pairing.pairing.active = true;
-            pairing.pairing.expiry = expiry + EXPIRY_30_DAYS;
+            self.active_impl(&mut pairing, expiry)
         }
 
-        Ok(())
+        Err(PairingClientError::PairingNotFound)
+    }
+
+    fn active_impl(&self, pairing: &mut Pairing, expiry: u64) {
+        pairing.pairing.active = true;
+        pairing.pairing.expiry = expiry + EXPIRY_30_DAYS;
     }
 
     /// for either to update the expiry of an existing pairing.
