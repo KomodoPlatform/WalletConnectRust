@@ -8,6 +8,7 @@ use {
     std::collections::HashMap,
     thiserror::Error,
     url::Url,
+    wc_common::SymKey,
 };
 
 lazy_static! {
@@ -43,7 +44,7 @@ pub enum ParseError {
 pub struct ParsedWcUri {
     pub topic: Topic,
     pub version: String,
-    pub sym_key: String,
+    pub sym_key: SymKey,
     pub methods: Methods,
     pub relay_protocol: String,
     pub relay_data: Option<String>,
@@ -84,6 +85,10 @@ pub fn parse_wc_uri(uri: &str) -> Result<ParsedWcUri, ParseError> {
     let methods = parse_methods(methods_str.as_deref())?;
 
     let sym_key = params.remove("symKey").ok_or(ParseError::MissingSymKey)?;
+    let sym_key = hex::decode(sym_key)
+        .map_err(|_| ParseError::InvalidSymKey)?
+        .try_into()
+        .map_err(|_| ParseError::InvalidSymKey)?;
     let relay_protocol = params
         .remove("relay-protocol")
         .ok_or(ParseError::MissingRelayProtocol)?;

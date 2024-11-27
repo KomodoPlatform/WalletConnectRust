@@ -36,13 +36,14 @@ use {
 };
 
 // Duration for short-term expiry (5 minutes) in seconds.
-pub(crate) const EXPIRY_5_MINS: u64 = 300; // 5 mins
-/// The relay protocol used for WalletConnect communications.
+pub(crate) const EXPIRY_5_MINS: u64 = 300;
+// Duration for long-term expiry (30 days) in seconds.
 pub(crate) const EXPIRY_30_DAYS: u64 = 24 * 30 * 60 * 60;
 /// The relay protocol used for WalletConnect communications.
 const RELAY_PROTOCOL: &str = "irn";
 /// The version of the WalletConnect protocol.
 const VERSION: &str = "2";
+/// Pairing Delete error code.
 const PAIRING_DELETE_ERROR_CODE: i64 = 6000;
 
 /// Errors that can occur during pairing operations.
@@ -102,10 +103,7 @@ pub struct Pairing {
 impl Pairing {
     pub fn try_from_url(url: &str) -> Result<Self, PairingClientError> {
         let parsed = parse_wc_uri(url)?;
-        let sym_key = hex::decode(parsed.sym_key).map_err(|_| PairingClientError::InvalidSymKey)?;
-        let sym_key: SymKey = sym_key
-            .try_into()
-            .map_err(|_| PairingClientError::InvalidSymKey)?;
+        let sym_key = parsed.sym_key;
         let expiry = parsed.expiry_timestamp;
         let relay = Relay {
             protocol: parsed.relay_protocol,
@@ -166,14 +164,14 @@ pub struct PairingClient {
 }
 
 impl PairingClient {
-    /// initializes the client with persisted storage and a network connection
+    /// Initializes pairing client with in-memory storage
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Calculates and validates the current Unix timestamp
     /// to use as a base for pairing expiry times.
-    fn calc_expiry(&self) -> Result<u64, PairingClientError> {
+    fn calc_expiry_timestamp(&self) -> Result<u64, PairingClientError> {
         let expiry = Utc::now().timestamp();
         if expiry < 0 {
             return Err(PairingClientError::TimeError(
@@ -185,14 +183,13 @@ impl PairingClient {
     }
 
     /// Attempts to generate a new pairing, stores it in the client's pairing
-    /// list, subscribes to the pairing topic, and returns the necessary
-    /// information to establish a connection.
+    /// list and return the pairing uri and [Topic]
     pub fn create(
         &self,
         metadata: Metadata,
         methods: Option<Methods>,
     ) -> Result<(Topic, String), PairingClientError> {
-        let expiry = self.calc_expiry()?;
+        let expiry = self.calc_expiry_timestamp()?;
         let topic = Topic::generate();
         let relay = Relay {
             protocol: RELAY_PROTOCOL.to_owned(),
@@ -222,22 +219,12 @@ impl PairingClient {
         Ok((topic, uri))
     }
 
-    /// for responder to pair a pairing created by a proposer
-    pub fn pair(&self, url: &str, activate: bool) -> Result<Topic, PairingClientError> {
-        let expiry = self.calc_expiry()?;
-        let mut pairing = Pairing::try_from_url(url)?;
+    /// for responder to pair a pairing created by a proposer.
+    /// NOTE: caller is required to call the [PairingClient::activate] method.
+    /// On a successful pairing creation.
+    pub fn pair(&self, url: &str) -> Result<Topic, PairingClientError> {
+        let pairing = Pairing::try_from_url(url)?;
         let topic = pairing.pairing.topic.clone();
-
-        // Check if the pairing already exists
-        if self.activate(&topic).is_ok() {
-            return Ok(topic.clone());
-        }
-
-        // Activate the pairing if requested
-        if activate {
-            self.active_impl(&mut pairing, expiry)
-        }
-
         self.pairings.insert(topic.clone(), pairing);
 
         Ok(topic)
@@ -257,17 +244,13 @@ impl PairingClient {
 
     /// for either to activate a previously created pairing
     pub fn activate(&self, topic: &Topic) -> Result<(), PairingClientError> {
-        let expiry = self.calc_expiry()?;
         if let Some(mut pairing) = self.pairings.get_mut(topic) {
-            self.active_impl(&mut pairing, expiry)
+            let expiry = self.calc_expiry_timestamp()?;
+            pairing.pairing.active = true;
+            pairing.pairing.expiry = expiry + EXPIRY_30_DAYS;
         }
 
         Err(PairingClientError::PairingNotFound)
-    }
-
-    fn active_impl(&self, pairing: &mut Pairing, expiry: u64) {
-        pairing.pairing.active = true;
-        pairing.pairing.expiry = expiry + EXPIRY_30_DAYS;
     }
 
     /// for either to update the expiry of an existing pairing.
@@ -390,15 +373,13 @@ impl PairingClient {
         payload: Payload,
         client: &Client,
     ) -> Result<(), PairingClientError> {
-        // try to extend session before updating local store.
+        // try to extend session before updating in-memory store.
         let sym_key = self.sym_key(topic)?;
 
         let payload = serde_json::to_string(&payload)
             .map_err(|err| PairingClientError::EncodeError(err.to_string()))?;
         let message = encrypt_and_encode(EnvelopeType::Type0, payload, &sym_key)
             .map_err(|err| PairingClientError::EncodeError(err.to_string()))?;
-
-        // Publish the encrypted message
         {
             client
                 .publish(
