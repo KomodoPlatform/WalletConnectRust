@@ -60,11 +60,11 @@ pub struct ProposeNamespace {
 impl ProposeNamespace {
     fn supported(&self, required: &Self) -> Result<(), NamespaceError> {
         let join_err = |required: &BTreeSet<String>, ours: &BTreeSet<String>| -> String {
-            return required
+            required
                 .difference(ours)
                 .map(|s| s.as_str())
                 .collect::<Vec<_>>()
-                .join(",");
+                .join(",")
         };
 
         // validate chains
