@@ -56,6 +56,7 @@ pub async fn deploy_contract(
         &cache_folder,
         "--out",
         &out_folder,
+        "--broadcast",
     ];
     if let Some(arg) = constructor_arg {
         args.push("--constructor-args");
