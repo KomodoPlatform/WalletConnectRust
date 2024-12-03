@@ -32,7 +32,7 @@ pub enum ConnectionControl {
     OutboundRequest(OutboundRequest),
 }
 
-pub(super) async fn connection_event_loop<T>(
+pub async fn connection_event_loop<T>(
     mut control_rx: UnboundedReceiver<ConnectionControl>,
     mut handler: T,
 ) where
@@ -81,6 +81,12 @@ pub(super) async fn connection_event_loop<T>(
                     }
 
                     StreamEvent::InboundError(error) => {
+                        if let ClientError::WebsocketClient(WebsocketClientError::Transport(err)) = &error {
+                            let err_str =  err.to_string();
+                            if err_str.contains("Operation timed out") || err_str.contains("unexpected end of file") {
+                                conn.reset();
+                            };
+                        }
                         handler.inbound_error(error);
                     }
 
@@ -123,7 +129,6 @@ impl Connection {
 
         match stream {
             Some(mut stream) => stream.close(None).await,
-
             None => Err(WebsocketClientError::ClosingFailed(TransportError::AlreadyClosed).into()),
         }
     }

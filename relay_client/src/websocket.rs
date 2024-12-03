@@ -3,7 +3,6 @@ use tokio::spawn;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_futures::spawn_local as spawn;
 use {
-    self::connection::connection_event_loop,
     crate::{
         error::{ClientError, Error},
         ConnectionOptions,
@@ -30,11 +29,10 @@ use {
     tokio::sync::{
         mpsc::{self, UnboundedReceiver, UnboundedSender},
         oneshot,
-        Mutex,
     },
 };
 pub use {
-    connection::{Connection, ConnectionControl},
+    connection::{connection_event_loop, Connection, ConnectionControl},
     fetch::*,
     inbound::*,
     outbound::*,
@@ -145,7 +143,6 @@ type SubscriptionResult<T> = Result<T, Error<SubscriptionError>>;
 #[derive(Debug, Clone)]
 pub struct Client {
     control_tx: UnboundedSender<ConnectionControl>,
-    control_rx: Option<Arc<Mutex<UnboundedReceiver<ConnectionControl>>>>,
 }
 
 impl Client {
@@ -155,26 +152,22 @@ impl Client {
         T: ConnectionHandler,
     {
         let (control_tx, control_rx) = mpsc::unbounded_channel();
-
         spawn(connection_event_loop(control_rx, handler));
 
-        Self {
-            control_tx,
-            control_rx: None,
-        }
+        Self { control_tx }
     }
 
-    /// Creates a new managed [`Client`] with the provided handler.
-    pub fn new_unmanaged() -> Self {
+    /// Creates a new [`Client`] with a custom callback function to handle the
+    /// control receiver and handler.
+    pub fn new_with_callback<T, F, R>(handler: T, f: F) -> (Self, R)
+    where
+        T: ConnectionHandler,
+        F: Fn(UnboundedReceiver<ConnectionControl>, T) -> R,
+    {
         let (control_tx, control_rx) = mpsc::unbounded_channel();
-        Self {
-            control_tx,
-            control_rx: Some(Arc::new(control_rx.into())),
-        }
-    }
+        let res = f(control_rx, handler);
 
-    pub fn control_rx(&self) -> Option<Arc<Mutex<UnboundedReceiver<ConnectionControl>>>> {
-        self.control_rx.clone()
+        (Self { control_tx }, res)
     }
 
     /// Publishes a message over the network on given topic.
