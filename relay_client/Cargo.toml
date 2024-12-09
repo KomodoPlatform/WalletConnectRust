@@ -19,14 +19,14 @@ futures-util = { version = "0.3", default-features = false, features = [
 ] }
 http = "1.0.0"
 pin-project = "1.0"
-rand = { version = "0.8.5", features = ["std", "small_rng"] }
+rand = { version = "0.8", features = ["std", "small_rng"] }
 relay_rpc = { path = "../relay_rpc" }
 reqwest = { version = "0.12.2", optional = true, features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_qs = "0.10"
 thiserror = "1.0"
-tokio = { version = "1.22", features = ["sync", "macros"] }
+tokio = { version = "1.22", features = ["rt", "sync", "macros"] }
 tokio-tungstenite-wasm = { git = "https://github.com/KomodoPlatform/tokio-tungstenite-wasm.git", features = ["rustls-tls-native-roots"], rev = "8fc7e2f" }
 tokio-util = "0.7"
 url = "2.3"
