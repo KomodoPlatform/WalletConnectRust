@@ -257,6 +257,7 @@ impl PairingClient {
             let timestamp = self.current_timestamp_secs()?;
             pairing.info.active = true;
             pairing.info.expiry = timestamp + EXPIRY_30_DAYS;
+            return Ok(());
         }
 
         Err(PairingClientError::PairingNotFound)
