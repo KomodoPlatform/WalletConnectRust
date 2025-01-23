@@ -11,6 +11,8 @@ macro_rules! new_type {
             Hash,
             Clone,
             PartialEq,
+            PartialOrd,
+            Ord,
             Eq,
             ::serde::Serialize,
             ::serde::Deserialize,
