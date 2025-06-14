@@ -37,6 +37,8 @@ pub struct SessionSettleRequest {
     ///
     /// Expiry should be between .now() + TTL.
     pub expiry: u64,
+    // TODO: There doesn't seem to be a sessionProperties field as per the spec: https://specs.walletconnect.com/2.0/specs/clients/sign/rpc-methods#wc_sessionsettle
+    //       Instead, there is an optional specialNamespaces field that's missing.
     pub session_properties: Option<Value>,
 }
 
